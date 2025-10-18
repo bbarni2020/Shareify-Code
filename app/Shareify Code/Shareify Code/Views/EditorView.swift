@@ -42,18 +42,35 @@ struct EditorView: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
                     
-                    TextEditor(text: Binding<String>(
-                        get: { active.content },
-                        set: { vm.updateActiveContent($0) }
-                    ))
-                    .font(.system(.body, design: .monospaced))
-                    .padding(16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 24, style: .continuous)
-                            .fill(Color(.systemBackground).opacity(0.7))
-                            .glassLikeBackground()
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    if active.url.detectedLanguage != .unknown {
+                        SyntaxHighlightingTextEditor(
+                            text: Binding<String>(
+                                get: { active.content },
+                                set: { vm.updateActiveContent($0) }
+                            ),
+                            language: active.url.detectedLanguage
+                        )
+                        .padding(16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                .fill(Color(.systemBackground).opacity(0.7))
+                                .glassLikeBackground()
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    } else {
+                        TextEditor(text: Binding<String>(
+                            get: { active.content },
+                            set: { vm.updateActiveContent($0) }
+                        ))
+                        .font(.system(.body, design: .monospaced))
+                        .padding(16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                .fill(Color(.systemBackground).opacity(0.7))
+                                .glassLikeBackground()
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    }
                     Spacer(minLength: 0)
                 }
             } else {
