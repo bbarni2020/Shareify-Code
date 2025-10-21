@@ -149,18 +149,15 @@ struct ExplorerView: View {
                 placeholder: "filename.swift",
                 itemName: $newFileName,
                 onCreate: {
-                    if let root = vm.rootURL, !newFileName.isEmpty {
-                        let url = root.appendingPathComponent(newFileName)
-                        FileManager.default.createFile(atPath: url.path, contents: nil)
-                        vm.refreshNode(FileNode(url: root, isDirectory: true))
-                    }
+                    vm.createFile(name: newFileName, in: vm.selectedNode?.isDirectory == true ? vm.selectedNode : nil)
                     showNewFileSheet = false
                     newFileName = ""
                 },
                 onCancel: {
                     showNewFileSheet = false
                     newFileName = ""
-                }
+                },
+                targetFolder: vm.selectedNode?.isDirectory == true ? vm.selectedNode!.name : (vm.rootNode?.name ?? "Root")
             )
         }
         .sheet(isPresented: $showNewFolderSheet) {
@@ -171,18 +168,15 @@ struct ExplorerView: View {
                 placeholder: "folder-name",
                 itemName: $newFolderName,
                 onCreate: {
-                    if let root = vm.rootURL, !newFolderName.isEmpty {
-                        let url = root.appendingPathComponent(newFolderName)
-                        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-                        vm.refreshNode(FileNode(url: root, isDirectory: true))
-                    }
+                    vm.createFolder(name: newFolderName, in: vm.selectedNode?.isDirectory == true ? vm.selectedNode : nil)
                     showNewFolderSheet = false
                     newFolderName = ""
                 },
                 onCancel: {
                     showNewFolderSheet = false
                     newFolderName = ""
-                }
+                },
+                targetFolder: vm.selectedNode?.isDirectory == true ? vm.selectedNode!.name : (vm.rootNode?.name ?? "Root")
             )
         }
     }
@@ -224,6 +218,7 @@ private struct NewItemSheet: View {
     @Binding var itemName: String
     let onCreate: () -> Void
     let onCancel: () -> Void
+    var targetFolder: String = "Root"
     
     @FocusState private var isTextFieldFocused: Bool
     
@@ -243,6 +238,16 @@ private struct NewItemSheet: View {
                 Text(title)
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(Color.appTextPrimary)
+                
+                Text("in: \(targetFolder)")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.appTextTertiary)
+                    .padding(.horizontal, Theme.spacingM)
+                    .padding(.vertical, Theme.spacingXS)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.radiusS, style: .continuous)
+                            .fill(Color.appCodeBackground)
+                    )
             }
 
             VStack(spacing: Theme.spacingS) {
@@ -371,6 +376,7 @@ private struct FileTreeNodeView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture(count: 1) {
+            vm.selectedNode = node
             if node.isDirectory {
                 withAnimation(.easeInOut(duration: Theme.animationFast)) {
                     vm.toggleExpanded(node)

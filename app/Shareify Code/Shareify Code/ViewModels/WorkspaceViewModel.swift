@@ -17,6 +17,7 @@ final class WorkspaceViewModel: ObservableObject {
     @Published var expanded: Set<String> = []
     @Published var showHiddenFiles = false
     @Published var showFolderImporter = false
+    @Published var selectedNode: FileNode?
 
     struct OpenFile: Identifiable, Hashable {
         var id: String { url.path }
@@ -73,20 +74,61 @@ final class WorkspaceViewModel: ObservableObject {
 
     func setRootFromPickedURL(_ url: URL) {
         #if os(iOS)
-        let accessed = url.startAccessingSecurityScopedResource()
-        _ = accessed
+        _ = url.startAccessingSecurityScopedResource()
+        
+        do {
+            let bookmarkData = try url.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
+            UserDefaults.standard.set(bookmarkData, forKey: "lastOpenedFolder")
+        } catch {
+            print("Failed to create bookmark: \(error)")
+        }
         #endif
         loadRoot(url)
     }
 
     func refreshNode(_ node: FileNode) {
         guard node.isDirectory else { return }
-        if node.url == rootURL {
-            rootNode?.children = FileNode.loadChildren(of: node.url, showHidden: showHiddenFiles)
-        } else {
-            if let rootURL { rootNode = FileNode.makeRoot(from: rootURL, showHidden: showHiddenFiles) }
+        if let rootURL {
+            rootNode = FileNode.makeRoot(from: rootURL, showHidden: showHiddenFiles)
         }
         objectWillChange.send()
+    }
+    
+    func createFile(name: String, in parentNode: FileNode?) {
+        guard !name.isEmpty else { return }
+        let parent = parentNode ?? (rootNode != nil ? FileNode(url: rootURL!, isDirectory: true) : nil)
+        guard let parent = parent, parent.isDirectory else { return }
+        
+        #if os(iOS)
+        let accessing = parent.url.startAccessingSecurityScopedResource()
+        defer { if accessing { parent.url.stopAccessingSecurityScopedResource() } }
+        #endif
+        
+        let fileURL = parent.url.appendingPathComponent(name)
+        if FileManager.default.createFile(atPath: fileURL.path, contents: Data()) {
+            expanded.insert(parent.id)
+            refreshNode(parent)
+        }
+    }
+    
+    func createFolder(name: String, in parentNode: FileNode?) {
+        guard !name.isEmpty else { return }
+        let parent = parentNode ?? (rootNode != nil ? FileNode(url: rootURL!, isDirectory: true) : nil)
+        guard let parent = parent, parent.isDirectory else { return }
+        
+        #if os(iOS)
+        let accessing = parent.url.startAccessingSecurityScopedResource()
+        defer { if accessing { parent.url.stopAccessingSecurityScopedResource() } }
+        #endif
+        
+        let folderURL = parent.url.appendingPathComponent(name)
+        do {
+            try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+            expanded.insert(parent.id)
+            refreshNode(parent)
+        } catch {
+            print("Folder creation failed: \(error)")
+        }
     }
 
     func toggleExpanded(_ node: FileNode) {
@@ -96,10 +138,8 @@ final class WorkspaceViewModel: ObservableObject {
         } else {
             expanded.insert(node.id)
             if node.children == nil {
-                if node.url == rootURL {
-                    rootNode?.children = FileNode.loadChildren(of: node.url, showHidden: showHiddenFiles)
-                } else {
-                    if let rootURL { rootNode = FileNode.makeRoot(from: rootURL, showHidden: showHiddenFiles) }
+                if let rootURL { 
+                    rootNode = FileNode.makeRoot(from: rootURL, showHidden: showHiddenFiles) 
                 }
             }
         }
