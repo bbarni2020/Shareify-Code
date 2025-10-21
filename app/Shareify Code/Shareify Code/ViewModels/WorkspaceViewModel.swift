@@ -31,6 +31,8 @@ final class WorkspaceViewModel: ObservableObject {
 
     @Published var openFiles: [OpenFile] = []
     @Published var activeFileID: String?
+    @Published var fileToClose: String?
+    @Published var showUnsavedWarning = false
 
     func collapseAll() {
         if let rootURL { expanded = [rootURL.path] } else { expanded = [] }
@@ -158,11 +160,42 @@ final class WorkspaceViewModel: ObservableObject {
 
     func closeFile(_ id: String) {
         if let idx = openFiles.firstIndex(where: { $0.id == id }) {
+            if openFiles[idx].isDirty {
+                fileToClose = id
+                showUnsavedWarning = true
+            } else {
+                performCloseFile(id)
+            }
+        }
+    }
+    
+    func performCloseFile(_ id: String) {
+        if let idx = openFiles.firstIndex(where: { $0.id == id }) {
             openFiles.remove(at: idx)
             if activeFileID == id {
                 activeFileID = openFiles.last?.id
             }
         }
+        fileToClose = nil
+        showUnsavedWarning = false
+    }
+    
+    func saveAndCloseFile(_ id: String) {
+        if let idx = openFiles.firstIndex(where: { $0.id == id }) {
+            let f = openFiles[idx]
+            do {
+                try f.content.write(to: f.url, atomically: true, encoding: .utf8)
+                openFiles[idx].isDirty = false
+                performCloseFile(id)
+            } catch {
+                print("Save error: \(error)")
+            }
+        }
+    }
+    
+    func cancelClose() {
+        fileToClose = nil
+        showUnsavedWarning = false
     }
 
     func updateActiveContent(_ text: String) {
@@ -180,5 +213,78 @@ final class WorkspaceViewModel: ObservableObject {
         } catch {
             print("Save error: \(error)")
         }
+    }
+    
+    func executeAction(_ action: AIAction) -> Result<String, Error> {
+        switch action.type {
+        case .edit(let old, let new):
+            return executeEditAction(old: old, new: new)
+            
+        case .rewrite(let file, let content):
+            return executeRewriteAction(file: file, content: content)
+            
+        case .insert(let after, let content):
+            return executeInsertAction(after: after, content: content)
+            
+        case .terminal(let command, let reason):
+            return .success("Terminal command ready: \(command)\nReason: \(reason)")
+            
+        case .search(let pattern, let reason):
+            return .success("Search pattern: \(pattern)\nReason: \(reason)")
+        }
+    }
+    
+    private func executeEditAction(old: String, new: String) -> Result<String, Error> {
+        guard let id = activeFileID, let idx = openFiles.firstIndex(where: { $0.id == id }) else {
+            return .failure(NSError(domain: "AIAction", code: 1, userInfo: [NSLocalizedDescriptionKey: "No active file"]))
+        }
+        
+        let currentContent = openFiles[idx].content
+        
+        guard currentContent.contains(old) else {
+            return .failure(NSError(domain: "AIAction", code: 2, userInfo: [NSLocalizedDescriptionKey: "Could not find the code to replace. The file may have been modified."]))
+        }
+        
+        let newContent = currentContent.replacingOccurrences(of: old, with: new)
+        openFiles[idx].content = newContent
+        openFiles[idx].isDirty = true
+        
+        return .success("Code successfully updated in \(openFiles[idx].title)")
+    }
+    
+    private func executeRewriteAction(file: String, content: String) -> Result<String, Error> {
+        guard let id = activeFileID, let idx = openFiles.firstIndex(where: { $0.id == id }) else {
+            return .failure(NSError(domain: "AIAction", code: 1, userInfo: [NSLocalizedDescriptionKey: "No active file"]))
+        }
+        
+        if openFiles[idx].title != file {
+            return .failure(NSError(domain: "AIAction", code: 3, userInfo: [NSLocalizedDescriptionKey: "File name mismatch. Expected \(openFiles[idx].title) but got \(file)"]))
+        }
+        
+        openFiles[idx].content = content
+        openFiles[idx].isDirty = true
+        
+        return .success("File \(file) completely rewritten")
+    }
+    
+    private func executeInsertAction(after: String, content: String) -> Result<String, Error> {
+        guard let id = activeFileID, let idx = openFiles.firstIndex(where: { $0.id == id }) else {
+            return .failure(NSError(domain: "AIAction", code: 1, userInfo: [NSLocalizedDescriptionKey: "No active file"]))
+        }
+        
+        let currentContent = openFiles[idx].content
+        
+        guard let range = currentContent.range(of: after) else {
+            return .failure(NSError(domain: "AIAction", code: 2, userInfo: [NSLocalizedDescriptionKey: "Could not find the anchor point in the file"]))
+        }
+        
+        let insertIndex = range.upperBound
+        var newContent = currentContent
+        newContent.insert(contentsOf: "\n\(content)", at: insertIndex)
+        
+        openFiles[idx].content = newContent
+        openFiles[idx].isDirty = true
+        
+        return .success("Code successfully inserted in \(openFiles[idx].title)")
     }
 }

@@ -86,7 +86,7 @@ struct SharAIView: View {
                     chatMessages.removeAll()
                     errorMessage = nil
                 }) {
-                    Image(systemName: "arrow.counterclockwise")
+                    Image(systemName: "trash")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Color.appTextSecondary)
                         .frame(width: 28, height: 28)
@@ -197,7 +197,11 @@ struct SharAIView: View {
                         .frame(maxWidth: .infinity)
                     } else {
                         ForEach(chatMessages) { message in
-                            ChatBubbleView(message: message)
+                            ChatBubbleView(message: message, vm: vm, onActionExecuted: { messageId, actionId, result in
+                                if let idx = chatMessages.firstIndex(where: { $0.id == messageId }) {
+                                    chatMessages[idx].actionResults[actionId] = result
+                                }
+                            })
                         }
                         
                         if isLoading {
@@ -355,7 +359,6 @@ struct SharAIView: View {
         let userMessage = DisplayMessage(content: userInput, isUser: true)
         chatMessages.append(userMessage)
         
-        let currentInput = userInput
         userInput = ""
         errorMessage = nil
         isLoading = true
@@ -366,7 +369,7 @@ struct SharAIView: View {
                     ChatMessage(role: msg.isUser ? "user" : "assistant", content: msg.content)
                 }
                 
-                if includeContext, let activeFile = vm.openFiles.first(where: { $0.id == vm.activeFileID }) {
+                if includeContext, vm.openFiles.first(where: { $0.id == vm.activeFileID }) != nil {
                     apiMessages[apiMessages.count - 1] = ChatMessage(
                         role: "user",
                         content: messageContent
@@ -379,7 +382,9 @@ struct SharAIView: View {
                 )
                 
                 await MainActor.run {
-                    let aiMessage = DisplayMessage(content: response, isUser: false)
+                    let parsed = AIActionParser.parseActions(from: response)
+                    var aiMessage = DisplayMessage(content: parsed.cleanResponse, isUser: false)
+                    aiMessage.actions = parsed.actions
                     chatMessages.append(aiMessage)
                     isLoading = false
                 }
@@ -415,10 +420,14 @@ struct DisplayMessage: Identifiable {
     let content: String
     let isUser: Bool
     let timestamp = Date()
+    var actions: [AIAction] = []
+    var actionResults: [UUID: Result<String, Error>] = [:]
 }
 
 struct ChatBubbleView: View {
     let message: DisplayMessage
+    @ObservedObject var vm: WorkspaceViewModel
+    let onActionExecuted: (UUID, UUID, Result<String, Error>) -> Void
     
     var body: some View {
         HStack(alignment: .top, spacing: Theme.spacingS) {
@@ -448,6 +457,19 @@ struct ChatBubbleView: View {
                                     : Color.appSurfaceElevated
                             )
                     )
+                
+                if !message.actions.isEmpty {
+                    ForEach(message.actions) { action in
+                        ActionCardView(
+                            action: action,
+                            vm: vm,
+                            result: message.actionResults[action.id],
+                            onExecute: { result in
+                                onActionExecuted(message.id, action.id, result)
+                            }
+                        )
+                    }
+                }
                 
                 Text(message.timestamp, style: .time)
                     .font(.system(size: 10))
@@ -501,5 +523,130 @@ struct SuggestionChip: View {
             )
         }
         .buttonStyle(.plain)
+    }
+}
+
+struct ActionCardView: View {
+    let action: AIAction
+    @ObservedObject var vm: WorkspaceViewModel
+    let result: Result<String, Error>?
+    let onExecute: (Result<String, Error>) -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.spacingS) {
+            HStack {
+                Image(systemName: actionIcon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(actionColor)
+                
+                Text(actionTitle)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.appTextPrimary)
+                
+                Spacer()
+                
+                if result == nil {
+                    Button(action: executeAction) {
+                        Text("Apply")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: Theme.radiusS, style: .continuous)
+                                    .fill(actionColor)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            
+            if let result = result {
+                switch result {
+                case .success(let message):
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.green)
+                        Text(message)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.appTextSecondary)
+                    }
+                case .failure(let error):
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.red)
+                        Text(error.localizedDescription)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.red)
+                    }
+                }
+            } else {
+                Text(actionDescription)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.appTextSecondary)
+                    .lineLimit(2)
+            }
+        }
+        .padding(Theme.spacingM)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.radiusS, style: .continuous)
+                .fill(Color.appCodeBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.radiusS, style: .continuous)
+                .stroke(actionColor.opacity(0.3), lineWidth: 1)
+        )
+    }
+    
+    private var actionIcon: String {
+        switch action.type {
+        case .edit: return "pencil.circle.fill"
+        case .rewrite: return "arrow.triangle.2.circlepath"
+        case .insert: return "plus.circle.fill"
+        case .terminal: return "terminal.fill"
+        case .search: return "magnifyingglass.circle.fill"
+        }
+    }
+    
+    private var actionColor: Color {
+        switch action.type {
+        case .edit: return .blue
+        case .rewrite: return .orange
+        case .insert: return .green
+        case .terminal: return .purple
+        case .search: return .cyan
+        }
+    }
+    
+    private var actionTitle: String {
+        switch action.type {
+        case .edit: return "Edit Code"
+        case .rewrite: return "Rewrite File"
+        case .insert: return "Insert Code"
+        case .terminal(let command, _): return "Run: \(command)"
+        case .search(let pattern, _): return "Search: \(pattern)"
+        }
+    }
+    
+    private var actionDescription: String {
+        switch action.type {
+        case .edit:
+            return "Replace code in the current file"
+        case .rewrite(let file, _):
+            return "Completely rewrite \(file)"
+        case .insert:
+            return "Insert new code into the file"
+        case .terminal(_, let reason):
+            return reason
+        case .search(_, let reason):
+            return reason
+        }
+    }
+    
+    private func executeAction() {
+        let result = vm.executeAction(action)
+        onExecute(result)
     }
 }

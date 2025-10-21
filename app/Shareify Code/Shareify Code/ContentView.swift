@@ -26,6 +26,26 @@ struct ContentView: View {
                     
                     if !showSharAI {
                         Button(action: {
+                            vm.openFolder()
+                        }) {
+                            Image(systemName: "folder.badge.plus")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(Color.appTextPrimary)
+                                .frame(width: 36, height: 36)
+                                .background(
+                                    Circle()
+                                        .fill(Color.appSurface)
+                                )
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.appBorder, lineWidth: 1)
+                                )
+                                .shadow(color: Theme.subtleShadow, radius: 8, x: 0, y: 2)
+                        }
+                        .buttonStyle(.plain)
+                        .transition(.opacity)
+                        
+                        Button(action: {
                             withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
                                 showSettings = true
                             }
@@ -149,6 +169,15 @@ struct ContentView: View {
                     SettingsView(isPresented: $showSettings, aiEnabled: $aiEnabled)
                         .transition(.scale(scale: 0.95).combined(with: .opacity))
                 }
+                
+                if vm.showUnsavedWarning {
+                    Color.black.opacity(0.5)
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+                    
+                    UnsavedWarningDialog(vm: vm)
+                        .transition(.scale(scale: 0.95).combined(with: .opacity))
+                }
             }
         )
         .background(
@@ -187,4 +216,118 @@ struct ContentView: View {
 
 #Preview {
     ContentView().environmentObject(WorkspaceViewModel())
+}
+
+struct UnsavedWarningDialog: View {
+    @ObservedObject var vm: WorkspaceViewModel
+    
+    var fileName: String {
+        guard let fileToClose = vm.fileToClose,
+              let file = vm.openFiles.first(where: { $0.id == fileToClose }) else {
+            return "this file"
+        }
+        return file.title
+    }
+    
+    var body: some View {
+        VStack(spacing: Theme.spacingXL) {
+            VStack(spacing: Theme.spacingM) {
+                ZStack {
+                    Circle()
+                        .fill(Color.orange.opacity(0.12))
+                        .frame(width: 64, height: 64)
+                    
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(Color.orange)
+                }
+                
+                VStack(spacing: Theme.spacingS) {
+                    Text("Unsaved Changes")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Color.appTextPrimary)
+                    
+                    Text("Do you want to save changes to \(fileName)?")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.appTextSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, Theme.spacingM)
+                }
+            }
+            
+            VStack(spacing: Theme.spacingM) {
+                Button(action: {
+                    withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                        if let fileToClose = vm.fileToClose {
+                            vm.saveAndCloseFile(fileToClose)
+                        }
+                    }
+                }) {
+                    Text("Save")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Theme.spacingM)
+                        .background(
+                            RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
+                                .fill(Color.appAccent)
+                        )
+                }
+                .buttonStyle(.plain)
+                
+                HStack(spacing: Theme.spacingM) {
+                    Button(action: {
+                        withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                            vm.cancelClose()
+                        }
+                    }) {
+                        Text("Cancel")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(Color.appTextSecondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, Theme.spacingM)
+                            .background(
+                                RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
+                                    .fill(Color.appSurfaceElevated)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
+                                            .stroke(Color.appBorder, lineWidth: 1)
+                                    )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Button(action: {
+                        withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                            if let fileToClose = vm.fileToClose {
+                                vm.performCloseFile(fileToClose)
+                            }
+                        }
+                    }) {
+                        Text("Discard")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.red)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, Theme.spacingM)
+                            .background(
+                                RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
+                                    .fill(Color.red.opacity(0.1))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
+                                            .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                                    )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(Theme.spacingXXL)
+        .frame(width: 420)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.radiusXL, style: .continuous)
+                .fill(Color.appSurface)
+                .shadow(color: Theme.panelShadow, radius: 32, x: 0, y: 16)
+        )
+    }
 }
