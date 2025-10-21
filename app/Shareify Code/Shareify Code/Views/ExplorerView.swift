@@ -1,9 +1,3 @@
-//
-//  ExplorerView.swift
-//  Shareify Code
-//
-
-
 import SwiftUI
 
 struct ExplorerView: View {
@@ -12,119 +6,141 @@ struct ExplorerView: View {
     @State private var showNewFolderSheet = false
     @State private var newFileName = ""
     @State private var newFolderName = ""
+    @State private var searchQuery = ""
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(spacing: 0) {
-                HStack {
+            HStack(spacing: Theme.spacingM) {
+                HStack(spacing: Theme.spacingS) {
+                    Image(systemName: "folder.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color.appAccent, Color.appAccentMuted],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                     Text("Explorer")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    Spacer()
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.appTextPrimary)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 18)
-
-                HStack(spacing: 8) {
-                    HStack(spacing: 6) {
-                        Button(action: { showNewFileSheet = true }) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "doc.badge.plus")
-                                    .font(.callout)
-                                Text("File")
-                                    .font(.subheadline.weight(.medium))
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .fill(vm.rootNode != nil ? Color.appAccent.opacity(0.15) : Color.gray.opacity(0.1))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .stroke(vm.rootNode != nil ? Color.appAccent.opacity(0.3) : Color.gray.opacity(0.2), lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(.plain)
+                
+                Spacer()
+                
+                HStack(spacing: Theme.spacingXS) {
+                    ToolbarIconButton(icon: "doc.badge.plus") { showNewFileSheet = true }
                         .disabled(vm.rootNode == nil)
-                        .opacity(vm.rootNode == nil ? 0.5 : 1.0)
-
-                        Button(action: { showNewFolderSheet = true }) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "folder.badge.plus")
-                                    .font(.callout)
-                                Text("Folder")
-                                    .font(.subheadline.weight(.medium))
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .fill(vm.rootNode != nil ? Color.orange.opacity(0.15) : Color.gray.opacity(0.1))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .stroke(vm.rootNode != nil ? Color.orange.opacity(0.3) : Color.gray.opacity(0.2), lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(.plain)
+                    ToolbarIconButton(icon: "folder.badge.plus") { showNewFolderSheet = true }
                         .disabled(vm.rootNode == nil)
-                        .opacity(vm.rootNode == nil ? 0.5 : 1.0)
+                    ToolbarIconButton(icon: "arrow.clockwise") {
+                        if let root = vm.rootNode { vm.refreshNode(root) }
                     }
-                    
-                    Spacer()
-                    
-                    HStack(spacing: 8) {
-                        Button(action: { if let root = vm.rootNode { vm.refreshNode(root) } }) {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.body)
-                                .foregroundStyle(.secondary)
-                        }
-                        .glassButtonStyleIfAvailable()
-
-                        Button(action: vm.openFolder) {
-                            Image(systemName: "folder")
-                                .font(.body)
-                                .foregroundStyle(.secondary)
-                        }
-                        .glassButtonStyleIfAvailable()
+                    ToolbarIconButton(icon: vm.showHiddenFiles ? "eye.fill" : "eye.slash.fill") {
+                        vm.showHiddenFiles.toggle()
+                        if let root = vm.rootNode { vm.refreshNode(root) }
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 10)
             }
-            .glassLikeBackground()
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .padding(.horizontal, Theme.spacingL)
+            .padding(.vertical, Theme.spacingM)
+            .background(
+                Color.appSurface
+                    .overlay(
+                        Rectangle()
+                            .fill(Color.appBorderSubtle)
+                            .frame(height: 1)
+                            .frame(maxHeight: .infinity, alignment: .bottom)
+                    )
+            )
 
-            Divider()
+            HStack(spacing: Theme.spacingS) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.appTextTertiary)
+                TextField("Search files...", text: $searchQuery)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: Theme.uiFontSize))
+                    .foregroundStyle(Color.appTextPrimary)
+                
+                if !searchQuery.isEmpty {
+                    Button(action: { searchQuery = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.appTextTertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, Theme.spacingM)
+            .padding(.vertical, Theme.spacingS)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.radiusS, style: .continuous)
+                    .fill(Color.appCodeBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.radiusS, style: .continuous)
+                            .stroke(Color.appBorder, lineWidth: 1)
+                    )
+            )
+            .padding(.horizontal, Theme.spacingM)
+            .padding(.vertical, Theme.spacingM)
 
             if let root = vm.rootNode {
                 ScrollViewReader { _ in
                     ScrollView {
-                        FileTreeNodeView(node: root, vm: vm)
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 4)
+                        FileTreeNodeView(node: root, vm: vm, searchQuery: searchQuery)
+                            .padding(.vertical, Theme.spacingS)
+                            .padding(.horizontal, Theme.spacingXS)
                     }
                 }
             } else {
-                VStack(spacing: 12) {
-                    Text("No Folder Open")
-                        .foregroundStyle(.secondary)
-                        .font(.title3)
-                    Button(action: vm.openFolder) {
-                        Label("Open Folder", systemImage: "folder")
-                            .font(.title2)
+                VStack(spacing: Theme.spacingL) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.appAccent.opacity(0.1))
+                            .frame(width: 88, height: 88)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.appAccent.opacity(0.3), lineWidth: 1)
+                            )
+                        
+                        Image(systemName: "folder")
+                            .font(.system(size: 32, weight: .medium))
+                            .foregroundStyle(Color.appAccent)
                     }
-                    .glassButtonStyleIfAvailable()
+                    
+                    VStack(spacing: Theme.spacingXS) {
+                        Text("No folder open")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(Color.appTextPrimary)
+                        Text("Open a folder to start editing")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.appTextSecondary)
+                    }
+                    
+                    Button(action: vm.openFolder) {
+                        HStack(spacing: Theme.spacingS) {
+                            Image(systemName: "folder")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("Open Folder")
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                        .foregroundStyle(Color.appTextPrimary)
+                        .padding(.horizontal, Theme.spacingL)
+                        .padding(.vertical, Theme.spacingM)
+                        .background(
+                            RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
+                                .fill(Color.appAccent)
+                        )
+                        .shadow(color: Color.appAccent.opacity(0.3), radius: 12, x: 0, y: 4)
+                    }
+                    .buttonStyle(.plain)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-
-            Spacer(minLength: 0)
         }
-        .frame(minWidth: 320)
-        .background(Color.clear)
+        .frame(minWidth: 280)
+        .background(Color.appSurface)
         .sheet(isPresented: $showNewFileSheet) {
             NewItemSheet(
                 title: "Create New File",
@@ -152,7 +168,7 @@ struct ExplorerView: View {
                 title: "Create New Folder",
                 icon: "folder.badge.plus",
                 iconColor: .orange,
-                placeholder: "my-folder",
+                placeholder: "folder-name",
                 itemName: $newFolderName,
                 onCreate: {
                     if let root = vm.rootURL, !newFolderName.isEmpty {
@@ -172,6 +188,34 @@ struct ExplorerView: View {
     }
 }
 
+private struct ToolbarIconButton: View {
+    let icon: String
+    let action: () -> Void
+    @State private var hover = false
+    @Environment(\.isEnabled) private var isEnabled
+    
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(isEnabled ? Color.appTextPrimary : Color.appTextTertiary)
+                .frame(width: 28, height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.radiusXS, style: .continuous)
+                        .fill(hover && isEnabled ? Color.appSurfaceHover : Color.appSurfaceElevated)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.radiusXS, style: .continuous)
+                        .stroke(Color.appBorder, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .onHover { h in
+            withAnimation(.easeInOut(duration: Theme.animationFast)) { hover = h }
+        }
+    }
+}
+
 private struct NewItemSheet: View {
     let title: String
     let icon: String
@@ -184,114 +228,112 @@ private struct NewItemSheet: View {
     @FocusState private var isTextFieldFocused: Bool
     
     var body: some View {
-        VStack(spacing: 24) {
-            VStack(spacing: 16) {
-                Image(systemName: icon)
-                    .font(.system(size: 48))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [iconColor, iconColor.opacity(0.7)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .padding(20)
-                    .background(
-                        Circle()
-                            .fill(iconColor.opacity(0.1))
-                    )
+        VStack(spacing: Theme.spacingXL) {
+            VStack(spacing: Theme.spacingM) {
+                ZStack {
+                    Circle()
+                        .fill(iconColor.opacity(0.12))
+                        .frame(width: 64, height: 64)
+                    
+                    Image(systemName: icon)
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(iconColor)
+                }
                 
                 Text(title)
-                    .font(.title2.weight(.semibold))
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color.appTextPrimary)
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Name")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.secondary)
-                
+            VStack(spacing: Theme.spacingS) {
                 TextField(placeholder, text: $itemName)
                     .textFieldStyle(.plain)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
+                    .font(.system(size: Theme.uiFontSize))
+                    .foregroundStyle(Color.appTextPrimary)
+                    .padding(.horizontal, Theme.spacingM)
+                    .padding(.vertical, Theme.spacingM)
                     .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color(.systemGray6))
+                        RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
+                            .fill(Color.appCodeBackground)
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(isTextFieldFocused ? iconColor : Color.clear, lineWidth: 2)
+                        RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
+                            .stroke(isTextFieldFocused ? iconColor.opacity(0.5) : Color.appBorder, lineWidth: 1)
                     )
                     .focused($isTextFieldFocused)
                     .submitLabel(.done)
                     .onSubmit {
-                        if !itemName.isEmpty {
-                            onCreate()
-                        }
+                        if !itemName.isEmpty { onCreate() }
                     }
+                
+                Text("Press Enter to create")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.appTextTertiary)
             }
-            
-            HStack(spacing: 12) {
+
+            HStack(spacing: Theme.spacingM) {
                 Button(action: onCancel) {
                     Text("Cancel")
-                        .font(.body.weight(.medium))
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color.appTextSecondary)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
+                        .padding(.vertical, Theme.spacingM)
                         .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Color(.systemGray5))
+                            RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
+                                .fill(Color.appSurfaceElevated)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
+                                        .stroke(Color.appBorder, lineWidth: 1)
+                                )
                         )
                 }
                 .buttonStyle(.plain)
                 
                 Button(action: onCreate) {
                     Text("Create")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.white)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(itemName.isEmpty ? Color.appTextTertiary : Color.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
+                        .padding(.vertical, Theme.spacingM)
                         .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(
-                                    LinearGradient(
-                                        colors: itemName.isEmpty ? [.gray] : [iconColor, iconColor.opacity(0.8)],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
+                            RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
+                                .fill(itemName.isEmpty ? Color.appSurfaceElevated : iconColor)
                         )
                 }
                 .buttonStyle(.plain)
                 .disabled(itemName.isEmpty)
-                .opacity(itemName.isEmpty ? 0.6 : 1.0)
             }
         }
-        .padding(32)
-        .frame(width: 400)
+        .padding(Theme.spacingXXL)
+        .frame(width: 420)
         .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: Theme.radiusXL, style: .continuous)
+                .fill(Color.appSurface)
+                .shadow(color: Theme.panelShadow, radius: 32, x: 0, y: 16)
         )
-        .onAppear {
-            isTextFieldFocused = true
-        }
+        .onAppear { isTextFieldFocused = true }
     }
 }
 
 private struct FileTreeNodeView: View {
     let node: FileNode
     @ObservedObject var vm: WorkspaceViewModel
+    var searchQuery: String
+    
+    @State private var hover = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            row(node)
-            if node.isDirectory, vm.expanded.contains(node.id) {
-                let children = childrenFor(node)
-                if !children.isEmpty {
-                    VStack(alignment: .leading, spacing: 2) {
-                        ForEach(children, id: \.id) { child in
-                            FileTreeNodeView(node: child, vm: vm)
-                                .padding(.leading, 12)
+        VStack(alignment: .leading, spacing: 1) {
+            if isVisible(node) {
+                row(node)
+                if node.isDirectory, vm.expanded.contains(node.id) {
+                    let children = childrenFor(node)
+                    if !children.isEmpty {
+                        VStack(alignment: .leading, spacing: 1) {
+                            ForEach(children, id: \.id) { child in
+                                FileTreeNodeView(node: child, vm: vm, searchQuery: searchQuery)
+                                    .padding(.leading, Theme.spacingL)
+                            }
                         }
                     }
                 }
@@ -300,41 +342,55 @@ private struct FileTreeNodeView: View {
     }
 
     private func row(_ node: FileNode) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.spacingS) {
             if node.isDirectory {
                 Image(systemName: vm.expanded.contains(node.id) ? "chevron.down" : "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.appTextTertiary)
                     .frame(width: 12)
             } else {
                 Spacer().frame(width: 12)
             }
 
             Image(systemName: iconForFile(node))
-                .font(.body)
+                .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(colorForFile(node))
-                .frame(width: 20)
+                .frame(width: 18)
 
             Text(node.name)
-                .font(.system(.body, design: .rounded))
+                .font(.system(size: Theme.uiFontSize, design: .monospaced))
                 .lineLimit(1)
                 .truncationMode(.middle)
+                .foregroundStyle(
+                    vm.activeFileID == node.url.path 
+                        ? Color.appAccent 
+                        : Color.appTextPrimary
+                )
             
             Spacer(minLength: 0)
         }
         .contentShape(Rectangle())
         .onTapGesture(count: 1) {
             if node.isDirectory {
-                vm.toggleExpanded(node)
+                withAnimation(.easeInOut(duration: Theme.animationFast)) {
+                    vm.toggleExpanded(node)
+                }
             } else {
                 vm.openFile(node.url)
             }
         }
-        .padding(.horizontal, 8)
+        .onHover { h in
+            withAnimation(.easeInOut(duration: Theme.animationFast)) { hover = h }
+        }
+        .padding(.horizontal, Theme.spacingS)
         .padding(.vertical, 6)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(vm.activeFileID == node.url.path ? Color.accentColor.opacity(0.15) : Color.clear)
+            RoundedRectangle(cornerRadius: Theme.radiusXS, style: .continuous)
+                .fill(
+                    vm.activeFileID == node.url.path 
+                        ? Color.appAccent.opacity(0.12)
+                        : (hover ? Color.appSurfaceHover : Color.clear)
+                )
         )
     }
     
@@ -342,40 +398,42 @@ private struct FileTreeNodeView: View {
         if node.isDirectory {
             return vm.expanded.contains(node.id) ? "folder.fill" : "folder"
         }
-
         let ext = node.url.pathExtension.lowercased()
         let imageExtensions = ["png", "jpg", "jpeg", "gif", "svg", "ico", "bmp", "webp"]
-        if imageExtensions.contains(ext) {
-            return "photo"
-        }
-
-        if ext == "pdf" { return "doc.richtext" }
-
+        if imageExtensions.contains(ext) { return "photo.fill" }
+        if ext == "pdf" { return "doc.richtext.fill" }
         let language = node.url.detectedLanguage
         return language.info.icon
     }
     
     private func colorForFile(_ node: FileNode) -> Color {
-        if node.isDirectory {
-            return .appAccent
-        }
-
+        if node.isDirectory { return .appAccent }
         let ext = node.url.pathExtension.lowercased()
         let imageExtensions = ["png", "jpg", "jpeg", "gif", "svg", "ico", "bmp", "webp"]
-        if imageExtensions.contains(ext) {
-            return .pink
-        }
-        
+        if imageExtensions.contains(ext) { return .pink }
         if ext == "pdf" { return .red }
-
         let language = node.url.detectedLanguage
         return language.info.color
     }
 
     private func childrenFor(_ node: FileNode) -> [FileNode] {
-        if node.url == vm.rootURL {
-            return vm.rootNode?.children ?? []
-        }
+        if node.url == vm.rootURL { return vm.rootNode?.children ?? [] }
         return FileNode.loadChildren(of: node.url, showHidden: vm.showHiddenFiles)
+    }
+
+    private func isVisible(_ node: FileNode) -> Bool {
+        let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        if q.isEmpty { return true }
+        if node.name.localizedCaseInsensitiveContains(q) { return true }
+        if node.isDirectory { return hasDescendantMatch(node, query: q) }
+        return false
+    }
+
+    private func hasDescendantMatch(_ node: FileNode, query: String) -> Bool {
+        for child in childrenFor(node) {
+            if child.name.localizedCaseInsensitiveContains(query) { return true }
+            if child.isDirectory && hasDescendantMatch(child, query: query) { return true }
+        }
+        return false
     }
 }

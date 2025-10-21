@@ -15,6 +15,8 @@ struct Shareify_CodeApp: App {
             ContentView()
                 .environmentObject(vm)
                 .tint(.appAccent)
+                .preferredColorScheme(.dark)
+                .background(Color.appBackground)
         }
         .commands {
             CommandGroup(replacing: .newItem) {

@@ -1,8 +1,3 @@
-//
-//  SharAIView.swift
-//  Shareify Code
-//
-
 import SwiftUI
 
 struct SharAIView: View {
@@ -13,146 +8,165 @@ struct SharAIView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            VStack(spacing: 0) {
-                HStack {
-                    HStack(spacing: 8) {
-                        Image(systemName: "sparkles")
-                            .font(.title3)
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.purple, .pink, .orange],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
+            HStack {
+                HStack(spacing: Theme.spacingS) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color.appAccent, Color.appAccentMuted],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
-                        
-                        Text("SharAI")
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(.primary)
-                    }
+                        )
                     
-                    Spacer()
-                    
-                    Button(action: { isOpen = false }) {
-                        Image(systemName: "xmark")
-                            .font(.body.weight(.medium))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 28, height: 28)
-                            .background(
-                                Circle()
-                                    .fill(Color(.systemGray5))
-                            )
-                    }
-                    .buttonStyle(.plain)
+                    Text("SharAI")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.appTextPrimary)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 18)
-                .padding(.bottom, 10)
+                
+                Spacer()
+                
+                Button(action: {
+                    withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                        isOpen = false
+                    }
+                }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.appTextSecondary)
+                        .frame(width: 28, height: 28)
+                        .background(
+                            Circle()
+                                .fill(Color.appSurfaceElevated)
+                        )
+                }
+                .buttonStyle(.plain)
             }
-            .glassLikeBackground()
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            
-            Divider()
-                .padding(.horizontal, 16)
+            .padding(.horizontal, Theme.spacingL)
+            .padding(.vertical, Theme.spacingM)
+            .background(
+                Color.appSurface
+                    .overlay(
+                        Rectangle()
+                            .fill(Color.appBorderSubtle)
+                            .frame(height: 1)
+                            .frame(maxHeight: .infinity, alignment: .bottom)
+                    )
+            )
 
             ScrollView {
-                VStack(spacing: 16) {
+                VStack(spacing: Theme.spacingL) {
                     if chatMessages.isEmpty {
-                        VStack(spacing: 20) {
-                            Image(systemName: "sparkles.rectangle.stack.fill")
-                                .font(.system(size: 56))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [.purple, .pink],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
+                        VStack(spacing: Theme.spacingXL) {
+                            Spacer()
+                            
+                            ZStack {
+                                Circle()
+                                    .fill(Color.appAccent.opacity(0.1))
+                                    .frame(width: 96, height: 96)
+                                
+                                Image(systemName: "sparkles.rectangle.stack.fill")
+                                    .font(.system(size: 40, weight: .medium))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [Color.appAccent, Color.appAccentMuted],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
                                     )
-                                )
-                                .padding(.top, 40)
+                            }
                             
-                            Text("Your AI Pair Programmer")
-                                .font(.title2.weight(.semibold))
-                                .multilineTextAlignment(.center)
+                            VStack(spacing: Theme.spacingS) {
+                                Text("Your AI Assistant")
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .foregroundStyle(Color.appTextPrimary)
+                                
+                                Text("Ask me anything about your code or let me help you write it")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(Color.appTextSecondary)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, Theme.spacingXL)
+                            }
                             
-                            Text("Ask me anything about your code, or let me help you write it!")
-                                .font(.body)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 24)
-                            
-                            VStack(alignment: .leading, spacing: 12) {
+                            VStack(alignment: .leading, spacing: Theme.spacingS) {
                                 SuggestionChip(icon: "wand.and.stars", text: "Explain this function")
                                 SuggestionChip(icon: "hammer.fill", text: "Fix this bug")
                                 SuggestionChip(icon: "lightbulb.fill", text: "Suggest improvements")
                                 SuggestionChip(icon: "doc.text.fill", text: "Write documentation")
                             }
-                            .padding(.top, 20)
+                            
+                            Spacer()
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
                     } else {
                         ForEach(chatMessages) { message in
                             ChatBubbleView(message: message)
                         }
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(Theme.spacingM)
             }
             
             Spacer(minLength: 0)
 
-            VStack(spacing: 8) {
-                Divider()
-                    .padding(.horizontal, 16)
+            VStack(spacing: 0) {
+                Rectangle()
+                    .fill(Color.appBorderSubtle)
+                    .frame(height: 1)
                 
-                HStack(spacing: 12) {
+                HStack(spacing: Theme.spacingM) {
                     TextField("Ask SharAI...", text: $userInput, axis: .vertical)
                         .textFieldStyle(.plain)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
+                        .font(.system(size: Theme.uiFontSize))
+                        .foregroundStyle(Color.appTextPrimary)
+                        .padding(.horizontal, Theme.spacingM)
+                        .padding(.vertical, Theme.spacingM)
                         .background(
-                            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .fill(Color(.systemBackground).opacity(0.6))
+                            RoundedRectangle(cornerRadius: Theme.radiusL, style: .continuous)
+                                .fill(Color.appCodeBackground)
                         )
                         .overlay(
-                            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .stroke(Color.accentColor.opacity(0.3), lineWidth: 1)
+                            RoundedRectangle(cornerRadius: Theme.radiusL, style: .continuous)
+                                .stroke(Color.appBorder, lineWidth: 1)
                         )
                         .lineLimit(1...5)
                     
                     Button(action: sendMessage) {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.title)
-                            .foregroundStyle(
-                                userInput.isEmpty ? 
-                                LinearGradient(
-                                    colors: [.gray, .gray],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ) :
-                                LinearGradient(
-                                    colors: [.purple, .pink],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
+                        ZStack {
+                            if userInput.isEmpty {
+                                Image(systemName: "arrow.up.circle.fill")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(Color.appTextTertiary)
+                            } else {
+                                Image(systemName: "arrow.up.circle.fill")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [Color.appAccent, Color.appAccentMuted],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                            }
+                        }
                     }
+                    .buttonStyle(.plain)
                     .disabled(userInput.isEmpty)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(.horizontal, Theme.spacingM)
+                .padding(.vertical, Theme.spacingM)
+                .background(Color.appSurface)
             }
-            .glassLikeBackground()
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         }
         .frame(minWidth: 320, maxWidth: 400, maxHeight: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.15), radius: 20, x: -5, y: 0)
+        .background(Color.appSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusXL, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.radiusXL, style: .continuous)
+                .stroke(Color.appBorder, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: Theme.panelShadow, radius: 32, x: -8, y: 0)
     }
     
     private func sendMessage() {
@@ -183,45 +197,50 @@ struct ChatBubbleView: View {
     let message: ChatMessage
     
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: Theme.spacingS) {
             if !message.isUser {
-                Image(systemName: "sparkles.rectangle.stack.fill")
-                    .font(.caption)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.purple, .pink],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 24, height: 24)
-                    .padding(6)
-                    .background(
-                        Circle()
-                            .fill(Color.purple.opacity(0.1))
-                    )
+                ZStack {
+                    Circle()
+                        .fill(Color.appAccent.opacity(0.12))
+                        .frame(width: 32, height: 32)
+                    
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.appAccent)
+                }
             }
             
-            VStack(alignment: message.isUser ? .trailing : .leading, spacing: 4) {
+            VStack(alignment: message.isUser ? .trailing : .leading, spacing: Theme.spacingXS) {
                 Text(message.content)
-                    .font(.body)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.appTextPrimary)
+                    .padding(.horizontal, Theme.spacingM)
+                    .padding(.vertical, Theme.spacingS)
                     .background(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(message.isUser ? Color.accentColor.opacity(0.2) : Color(.systemGray6))
+                        RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
+                            .fill(
+                                message.isUser 
+                                    ? Color.appAccent.opacity(0.15)
+                                    : Color.appSurfaceElevated
+                            )
                     )
                 
                 Text(message.timestamp, style: .time)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 4)
+                    .font(.system(size: 10))
+                    .foregroundStyle(Color.appTextTertiary)
+                    .padding(.horizontal, Theme.spacingXS)
             }
             
             if message.isUser {
-                Image(systemName: "person.circle.fill")
-                    .font(.title3)
-                    .foregroundStyle(Color.appAccent)
+                ZStack {
+                    Circle()
+                        .fill(Color.appSurfaceElevated)
+                        .frame(width: 32, height: 32)
+                    
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color.appTextSecondary)
+                }
             }
             
             if message.isUser {
@@ -237,21 +256,22 @@ struct SuggestionChip: View {
     let text: String
     
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.spacingS) {
             Image(systemName: icon)
-                .font(.caption)
+                .font(.system(size: 12, weight: .medium))
             Text(text)
-                .font(.subheadline)
+                .font(.system(size: 13))
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+        .foregroundStyle(Color.appTextSecondary)
+        .padding(.horizontal, Theme.spacingM)
+        .padding(.vertical, Theme.spacingS)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.accentColor.opacity(0.1))
+            RoundedRectangle(cornerRadius: Theme.radiusS, style: .continuous)
+                .fill(Color.appSurfaceElevated)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.accentColor.opacity(0.3), lineWidth: 1)
+            RoundedRectangle(cornerRadius: Theme.radiusS, style: .continuous)
+                .stroke(Color.appBorder, lineWidth: 1)
         )
     }
 }

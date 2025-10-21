@@ -1,9 +1,3 @@
-//
-//  GlassCompatibility.swift
-//  Shareify Code
-//
-
-
 import SwiftUI
 
 struct GlassButtonStyleIfAvailable: ViewModifier {
@@ -24,11 +18,32 @@ struct GlassButtonStyleIfAvailable: ViewModifier {
 struct GlassLikeBackground: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(iOS 15.0, macOS 12.0, *) {
-            content.background(.ultraThinMaterial)
-        } else {
-            content.background(Color.appUnderPageBackground)
-        }
+        content
+            .background(Color.appSurfaceElevated)
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
+                    .stroke(Color.appBorder, lineWidth: 1)
+            )
+    }
+}
+
+struct GlassBarBackground: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        content
+            .background(Color.appSurface)
+            .overlay(
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.04), Color.clear],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(height: 1)
+                    .frame(maxHeight: .infinity, alignment: .top)
+            )
     }
 }
 
@@ -39,5 +54,13 @@ extension View {
 
     func glassLikeBackground() -> some View {
         modifier(GlassLikeBackground())
+    }
+
+    func glassBarBackground() -> some View {
+        modifier(GlassBarBackground())
+    }
+
+    func glow(_ color: Color = .appAccent, radius: CGFloat = 12, opacity: Double = 0.4) -> some View {
+        shadow(color: color.opacity(opacity), radius: radius, x: 0, y: 0)
     }
 }

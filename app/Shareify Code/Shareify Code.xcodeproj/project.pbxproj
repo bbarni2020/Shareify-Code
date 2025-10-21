@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		109396C62EA7D8C200766362 /* Highlightr in Frameworks */ = {isa = PBXBuildFile; productRef = 1093967D2EA7D75A00766362 /* Highlightr */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		10FB6CBA2EA3A51600C87E84 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				109396C62EA7D8C200766362 /* Highlightr in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +117,7 @@
 			);
 			name = "Shareify Code";
 			packageProductDependencies = (
+				1093967D2EA7D75A00766362 /* Highlightr */,
 			);
 			productName = "Shareify Code";
 			productReference = 10FB6CAC2EA3A51400C87E84 /* Shareify Code.app */;
@@ -195,6 +201,9 @@
 			);
 			mainGroup = 10FB6CA32EA3A51400C87E84;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				1093967C2EA7D75A00766362 /* XCRemoteSwiftPackageReference "Highlightr" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 10FB6CAD2EA3A51400C87E84 /* Products */;
 			projectDirPath = "";
@@ -400,6 +409,7 @@
 				DEVELOPMENT_TEAM = P6PV2R9443;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -434,6 +444,7 @@
 				DEVELOPMENT_TEAM = P6PV2R9443;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -582,6 +593,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		1093967C2EA7D75A00766362 /* XCRemoteSwiftPackageReference "Highlightr" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/raspu/Highlightr";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.3.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1093967D2EA7D75A00766362 /* Highlightr */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1093967C2EA7D75A00766362 /* XCRemoteSwiftPackageReference "Highlightr" */;
+			productName = Highlightr;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 10FB6CA42EA3A51400C87E84 /* Project object */;
 }

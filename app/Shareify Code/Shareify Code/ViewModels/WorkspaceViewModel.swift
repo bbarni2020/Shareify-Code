@@ -31,6 +31,25 @@ final class WorkspaceViewModel: ObservableObject {
     @Published var openFiles: [OpenFile] = []
     @Published var activeFileID: String?
 
+    func collapseAll() {
+        if let rootURL { expanded = [rootURL.path] } else { expanded = [] }
+    }
+
+    func expandAll() {
+        guard let root = rootNode else { return }
+        var set: Set<String> = []
+        collectDirectories(from: root, into: &set)
+        expanded = set
+    }
+
+    private func collectDirectories(from node: FileNode, into set: inout Set<String>) {
+        if node.isDirectory { set.insert(node.id) }
+        let children = node.children ?? FileNode.loadChildren(of: node.url, showHidden: showHiddenFiles)
+        for child in children where child.isDirectory {
+            collectDirectories(from: child, into: &set)
+        }
+    }
+
     func openFolder() {
         #if os(macOS)
         let panel = NSOpenPanel()
