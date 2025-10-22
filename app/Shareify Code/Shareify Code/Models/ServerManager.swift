@@ -229,6 +229,80 @@ class ServerManager {
         }.resume()
     }
     
+    func bridgeLogin(email: String, password: String, completion: @escaping (Result<[String: Any], Error>) -> Void) {
+        guard let url = URL(string: "https://bridge.bbarni.hackclub.app/login") else {
+            completion(.failure(ServerError.invalidURL))
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let requestBody: [String: Any] = [
+            "email": email,
+            "password": password
+        ]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        } catch {
+            completion(.failure(error))
+            return
+        }
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    completion(.failure(error))
+                    return
+                }
+                
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    completion(.failure(ServerError.invalidResponse))
+                    return
+                }
+                
+                guard let data = data else {
+                    completion(.failure(ServerError.noData))
+                    return
+                }
+                
+                if let raw = String(data: data, encoding: .utf8) {
+                    print("[ServerManager] bridge login response status=\(httpResponse.statusCode) -> \(raw)")
+                }
+                
+                do {
+                    let json = try JSONSerialization.jsonObject(with: data)
+                    
+                    if let jsonDict = json as? [String: Any] {
+                        if let errorMessage = jsonDict["error"] as? String {
+                            completion(.failure(ServerError.serverError(errorMessage)))
+                            return
+                        }
+                        
+                        if httpResponse.statusCode == 200 {
+                            if let jwtToken = jsonDict["jwt_token"] as? String {
+                                UserDefaults.standard.set(jwtToken, forKey: "jwt_token")
+                                UserDefaults.standard.set(email, forKey: "user_email")
+                                UserDefaults.standard.set(password, forKey: "user_password")
+                                UserDefaults.standard.synchronize()
+                            }
+                            completion(.success(jsonDict))
+                        } else {
+                            let errorMessage = jsonDict["error"] as? String ?? "Login failed"
+                            completion(.failure(ServerError.serverError(errorMessage)))
+                        }
+                    } else {
+                        completion(.failure(ServerError.invalidJSONResponse))
+                    }
+                } catch {
+                    completion(.failure(error))
+                }
+            }
+        }.resume()
+    }
+    
     private func refreshJWTTokenAndRetry(originalCommand: String, originalMethod: String, originalBody: [String: Any], originalWaitTime: Int = 2, completion: @escaping (Result<Any, Error>) -> Void) {
         guard let email = UserDefaults.standard.string(forKey: "user_email"),
               let password = UserDefaults.standard.string(forKey: "user_password"),
@@ -277,6 +351,65 @@ class ServerManager {
                 UserDefaults.standard.synchronize()
                 
                 self.executeServerCommand(command: originalCommand, method: originalMethod, body: originalBody, waitTime: originalWaitTime, completion: completion)
+            }
+        }.resume()
+    }
+    
+    func isServerLoggedIn() -> Bool {
+        let hasShareifyJWT = UserDefaults.standard.string(forKey: "shareify_jwt") != nil
+        return hasShareifyJWT
+    }
+    
+    func testServerConnection(completion: @escaping (Bool) -> Void) {
+        guard let jwtToken = UserDefaults.standard.string(forKey: "jwt_token"), !jwtToken.isEmpty else {
+            completion(false)
+            return
+        }
+        
+        guard let url = URL(string: "https://command.bbarni.hackclub.app/") else {
+            completion(false)
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(jwtToken)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 3
+        
+        if let shareifyJWT = UserDefaults.standard.string(forKey: "shareify_jwt"), !shareifyJWT.isEmpty {
+            request.setValue(shareifyJWT, forHTTPHeaderField: "X-Shareify-JWT")
+        }
+        
+        let requestBody: [String: Any] = [
+            "command": "/is_up",
+            "method": "GET",
+            "wait_time": 1
+        ]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        } catch {
+            completion(false)
+            return
+        }
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let _ = error {
+                DispatchQueue.main.async {
+                    completion(false)
+                }
+                return
+            }
+            
+            if let httpResponse = response as? HTTPURLResponse {
+                DispatchQueue.main.async {
+                    completion(httpResponse.statusCode == 200 || httpResponse.statusCode == 404)
+                }
+            } else {
+                DispatchQueue.main.async {
+                    completion(false)
+                }
             }
         }.resume()
     }

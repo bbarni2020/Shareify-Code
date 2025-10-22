@@ -18,13 +18,22 @@ final class WorkspaceViewModel: ObservableObject {
     @Published var showHiddenFiles = false
     @Published var showFolderImporter = false
     @Published var selectedNode: FileNode?
+    @Published var isServerFolder = false
+    @Published var serverFolderPath: String?
+    @Published var serverRootNode: ServerFileNode?
+    @Published var expandedServerPaths: Set<String> = []
+    
+    private var serverFolderCache: [String: [ServerFileNode]] = [:]
+    private var serverFileContentCache: [String: String] = [:]
 
     struct OpenFile: Identifiable, Hashable {
         var id: String { url.path }
         let url: URL
-        var title: String { url.lastPathComponent }
+        var customTitle: String?
+        var title: String { customTitle ?? url.lastPathComponent }
         var content: String
         var isDirty: Bool = false
+        var isLoading: Bool = false
         var cursorLine: Int = 1
         var cursorColumn: Int = 1
     }
@@ -33,6 +42,10 @@ final class WorkspaceViewModel: ObservableObject {
     @Published var activeFileID: String?
     @Published var fileToClose: String?
     @Published var showUnsavedWarning = false
+    
+    init() {
+        loadCacheFromUserDefaults()
+    }
 
     func collapseAll() {
         if let rootURL { expanded = [rootURL.path] } else { expanded = [] }
@@ -69,9 +82,21 @@ final class WorkspaceViewModel: ObservableObject {
     }
 
     func loadRoot(_ url: URL) {
+        isServerFolder = false
+        serverFolderPath = nil
+        serverRootNode = nil
+        expandedServerPaths = []
+
+        saveOpenFilesCache()
+        
+        openFiles = []
+        activeFileID = nil
+        
         rootURL = url
         rootNode = FileNode.makeRoot(from: url, showHidden: showHiddenFiles)
         expanded = [url.path]
+
+        UserDefaults.standard.set(url.path, forKey: "lastLocalFolderPath")
     }
 
     func setRootFromPickedURL(_ url: URL) {
@@ -286,5 +311,229 @@ final class WorkspaceViewModel: ObservableObject {
         openFiles[idx].isDirty = true
         
         return .success("Code successfully inserted in \(openFiles[idx].title)")
+    }
+    
+    func loadServerFolder(path: String, files: [ServerFileNode]) {
+        rootURL = nil
+        self.rootNode = nil
+        expanded = []
+
+        saveOpenFilesCache()
+
+        openFiles = []
+        activeFileID = nil
+
+        isServerFolder = true
+        serverFolderPath = path
+        
+        let serverRoot = ServerFileNode(
+            name: path.split(separator: "/").last.map(String.init) ?? "Root",
+            path: path,
+            isFolder: true,
+            children: files
+        )
+        
+        serverRootNode = serverRoot
+        serverFolderCache[path] = files
+        expandedServerPaths = [path]
+
+        UserDefaults.standard.set(path, forKey: "lastServerFolderPath")
+        saveCacheToUserDefaults()
+    }
+    
+    func loadServerChildren(for node: ServerFileNode, completion: @escaping ([ServerFileNode]) -> Void) {
+        if let cached = serverFolderCache[node.path] {
+            completion(cached)
+            return
+        }
+        
+        let requestBody: [String: Any] = ["path": node.path]
+        
+        ServerManager.shared.executeServerCommand(command: "/finder", method: "GET", body: requestBody, waitTime: 3) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let response):
+                    var fileNames: [String] = []
+                    if let responseDict = response as? [String: Any],
+                       let itemsArray = responseDict["items"] as? [String] {
+                        fileNames = itemsArray
+                    } else if let directArray = response as? [String] {
+                        fileNames = directArray
+                    }
+                    
+                    let children = fileNames.map { fileName in
+                        ServerFileNode(
+                            name: fileName,
+                            path: node.path + "/" + fileName,
+                            isFolder: !fileName.contains("."),
+                            children: nil
+                        )
+                    }
+                    
+                    self.serverFolderCache[node.path] = children
+                    self.saveCacheToUserDefaults()
+                    completion(children)
+                    
+                case .failure(let error):
+                    print("Failed to load server children: \(error)")
+                    completion([])
+                }
+            }
+        }
+    }
+    
+    func openServerFile(_ file: ServerFileNode) {
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("server_\(file.path.replacingOccurrences(of: "/", with: "_"))")
+        let serverTitle = "server\(file.path)"
+ 
+        if let idx = openFiles.firstIndex(where: { $0.id == tempURL.path }) {
+            activeFileID = tempURL.path
+            return
+        }
+
+        if let cachedContent = serverFileContentCache[file.path] {
+            let openFile = OpenFile(
+                url: tempURL,
+                customTitle: serverTitle,
+                content: cachedContent,
+                isDirty: false,
+                isLoading: false
+            )
+            openFiles.append(openFile)
+            activeFileID = openFile.id
+            return
+        }
+
+        let loadingFile = OpenFile(
+            url: tempURL,
+            customTitle: serverTitle,
+            content: "Loading...",
+            isDirty: false,
+            isLoading: true
+        )
+        openFiles.append(loadingFile)
+        activeFileID = loadingFile.id
+
+        let command = "/get_file?file_path=\(file.path.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? file.path)"
+        ServerManager.shared.executeServerCommand(command: command, method: "GET", body: [:], waitTime: 5) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let response):
+                    if let json = response as? [String: Any],
+                       let status = json["status"] as? String, status == "File content retrieved",
+                       let content = json["content"] as? String,
+                       let type = json["type"] as? String, type == "text" {
+
+                        self.serverFileContentCache[file.path] = content
+                        self.saveCacheToUserDefaults()
+                        
+                        if let idx = self.openFiles.firstIndex(where: { $0.id == tempURL.path }) {
+                            self.openFiles[idx].content = content
+                            self.openFiles[idx].isLoading = false
+                            try? content.write(to: tempURL, atomically: true, encoding: .utf8)
+                        }
+                    } else {
+                        if let idx = self.openFiles.firstIndex(where: { $0.id == tempURL.path }) {
+                            self.openFiles.remove(at: idx)
+                            if self.activeFileID == tempURL.path {
+                                self.activeFileID = self.openFiles.last?.id
+                            }
+                        }
+                    }
+                case .failure(let error):
+                    print("Failed to open server file: \(error)")
+                    if let idx = self.openFiles.firstIndex(where: { $0.id == tempURL.path }) {
+                        self.openFiles.remove(at: idx)
+                        if self.activeFileID == tempURL.path {
+                            self.activeFileID = self.openFiles.last?.id
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func saveCacheToUserDefaults() {
+        if let folderData = try? JSONEncoder().encode(serverFolderCache) {
+            UserDefaults.standard.set(folderData, forKey: "serverFolderCache")
+        }
+        if let contentData = try? JSONEncoder().encode(serverFileContentCache) {
+            UserDefaults.standard.set(contentData, forKey: "serverFileContentCache")
+        }
+    }
+    
+    private func saveOpenFilesCache() {
+        let openFilePaths = openFiles.map { $0.url.path }
+        UserDefaults.standard.set(openFilePaths, forKey: "openFilePaths")
+        UserDefaults.standard.set(activeFileID, forKey: "activeFileID")
+        
+        if isServerFolder {
+            UserDefaults.standard.set(true, forKey: "wasServerFolder")
+        } else {
+            UserDefaults.standard.set(false, forKey: "wasServerFolder")
+        }
+    }
+    
+    func loadCacheFromUserDefaults() {
+        if let folderData = UserDefaults.standard.data(forKey: "serverFolderCache"),
+           let cache = try? JSONDecoder().decode([String: [ServerFileNode]].self, from: folderData) {
+            serverFolderCache = cache
+        }
+        if let contentData = UserDefaults.standard.data(forKey: "serverFileContentCache"),
+           let cache = try? JSONDecoder().decode([String: String].self, from: contentData) {
+            serverFileContentCache = cache
+        }
+
+        let wasServerFolder = UserDefaults.standard.bool(forKey: "wasServerFolder")
+        
+        if wasServerFolder {
+            if let lastServerPath = UserDefaults.standard.string(forKey: "lastServerFolderPath"),
+               let cachedFiles = serverFolderCache[lastServerPath] {
+                let serverRoot = ServerFileNode(
+                    name: lastServerPath.split(separator: "/").last.map(String.init) ?? "Root",
+                    path: lastServerPath,
+                    isFolder: true,
+                    children: cachedFiles
+                )
+                
+                isServerFolder = true
+                serverFolderPath = lastServerPath
+                serverRootNode = serverRoot
+                expandedServerPaths = [lastServerPath]
+            }
+        } else {
+            if let lastLocalPath = UserDefaults.standard.string(forKey: "lastLocalFolderPath") {
+                let url = URL(fileURLWithPath: lastLocalPath)
+                if FileManager.default.fileExists(atPath: lastLocalPath) {
+                    rootURL = url
+                    rootNode = FileNode.makeRoot(from: url, showHidden: showHiddenFiles)
+                    expanded = [url.path]
+                }
+            }
+        }
+    }
+}
+
+struct ServerFileNode: Identifiable, Codable, Hashable {
+    let id: UUID
+    let name: String
+    let path: String
+    let isFolder: Bool
+    var children: [ServerFileNode]?
+    
+    init(name: String, path: String, isFolder: Bool, children: [ServerFileNode]? = nil) {
+        self.id = UUID()
+        self.name = name
+        self.path = path
+        self.isFolder = isFolder
+        self.children = children
+    }
+    
+    static func == (lhs: ServerFileNode, rhs: ServerFileNode) -> Bool {
+        lhs.path == rhs.path
+    }
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(path)
     }
 }

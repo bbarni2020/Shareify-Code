@@ -32,13 +32,37 @@ struct EditorView: View {
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(Color.appTextPrimary)
                         
+                        if active.isLoading {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                                .frame(width: 16, height: 16)
+                        }
+                        
                         Spacer()
                     }
                     .padding(.horizontal, Theme.spacingL)
                     .padding(.top, Theme.spacingM)
                     .padding(.bottom, Theme.spacingM)
                     
-                    if active.url.detectedLanguage != .unknown {
+                    if active.isLoading {
+                        VStack(spacing: Theme.spacingL) {
+                            ProgressView()
+                                .scaleEffect(1.5)
+                            
+                            Text("Loading file from server...")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(Color.appTextSecondary)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.appCodeBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusL, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.radiusL, style: .continuous)
+                                .stroke(Color.appBorder, lineWidth: 1)
+                        )
+                        .padding(.horizontal, Theme.spacingL)
+                        .padding(.bottom, Theme.spacingL)
+                    } else if active.url.detectedLanguage != .unknown {
                         SyntaxHighlightingTextEditor(
                             text: Binding<String>(
                                 get: { active.content },

@@ -7,6 +7,9 @@ struct ExplorerView: View {
     @State private var newFileName = ""
     @State private var newFolderName = ""
     @State private var searchQuery = ""
+    @State private var showFolderSourcePicker = false
+    @State private var showServerBrowser = false
+    @State private var isServerOnline = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -85,7 +88,13 @@ struct ExplorerView: View {
             .padding(.horizontal, Theme.spacingM)
             .padding(.vertical, Theme.spacingM)
 
-            if let root = vm.rootNode {
+            if vm.isServerFolder, let serverRoot = vm.serverRootNode {
+                ScrollView {
+                    ServerFileTreeNodeView(node: serverRoot, vm: vm, level: 0)
+                        .padding(.vertical, Theme.spacingS)
+                        .padding(.horizontal, Theme.spacingXS)
+                }
+            } else if let root = vm.rootNode {
                 ScrollViewReader { _ in
                     ScrollView {
                         FileTreeNodeView(node: root, vm: vm, searchQuery: searchQuery)
@@ -118,7 +127,13 @@ struct ExplorerView: View {
                             .foregroundStyle(Color.appTextSecondary)
                     }
                     
-                    Button(action: vm.openFolder) {
+                    Button(action: { 
+                        if isServerOnline {
+                            showFolderSourcePicker = true
+                        } else {
+                            vm.openFolder()
+                        }
+                    }) {
                         HStack(spacing: Theme.spacingS) {
                             Image(systemName: "folder")
                                 .font(.system(size: 14, weight: .semibold))
@@ -135,6 +150,15 @@ struct ExplorerView: View {
                         .shadow(color: Color.appAccent.opacity(0.3), radius: 12, x: 0, y: 4)
                     }
                     .buttonStyle(.plain)
+                    .confirmationDialog("Choose folder source", isPresented: $showFolderSourcePicker) {
+                        Button("Local / On Device") {
+                            vm.openFolder()
+                        }
+                        Button("Server") {
+                            showServerBrowser = true
+                        }
+                        Button("Cancel", role: .cancel) {}
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -178,6 +202,24 @@ struct ExplorerView: View {
                 },
                 targetFolder: vm.selectedNode?.isDirectory == true ? vm.selectedNode!.name : (vm.rootNode?.name ?? "Root")
             )
+        }
+        .sheet(isPresented: $showServerBrowser) {
+            ServerBrowserView(isPresented: $showServerBrowser)
+                .environmentObject(vm)
+        }
+        .onAppear {
+            checkServerConnection()
+        }
+    }
+    
+    private func checkServerConnection() {
+        guard ServerManager.shared.isServerLoggedIn() else {
+            isServerOnline = false
+            return
+        }
+        
+        ServerManager.shared.testServerConnection { isOnline in
+            isServerOnline = isOnline
         }
     }
 }
@@ -441,5 +483,221 @@ private struct FileTreeNodeView: View {
             if child.isDirectory && hasDescendantMatch(child, query: query) { return true }
         }
         return false
+    }
+}
+
+struct ServerFileTreeNodeView: View {
+    let node: ServerFileNode
+    @ObservedObject var vm: WorkspaceViewModel
+    let level: Int
+    @State private var children: [ServerFileNode] = []
+    @State private var isLoading = false
+    
+    var isExpanded: Bool {
+        vm.expandedServerPaths.contains(node.path)
+    }
+    
+    var isActiveFile: Bool {
+        if node.isFolder { return false }
+        let tempPath = FileManager.default.temporaryDirectory
+            .appendingPathComponent("server_\(node.path.replacingOccurrences(of: "/", with: "_"))")
+            .path
+        return vm.activeFileID == tempPath
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Button(action: {
+                if node.isFolder {
+                    toggleFolder()
+                } else {
+                    vm.openServerFile(node)
+                }
+            }) {
+                HStack(spacing: Theme.spacingS) {
+                    if node.isFolder {
+                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Color.appTextTertiary)
+                            .frame(width: 12)
+                    } else {
+                        Spacer()
+                            .frame(width: 12)
+                    }
+                    
+                    Image(systemName: iconForNode())
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(colorForNode())
+                        .frame(width: 20)
+                    
+                    Text(node.name)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.appTextPrimary)
+                        .lineLimit(1)
+                    
+                    if isLoading {
+                        ProgressView()
+                            .scaleEffect(0.6)
+                            .frame(width: 12, height: 12)
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.leading, CGFloat(level) * 16 + Theme.spacingM)
+                .padding(.trailing, Theme.spacingM)
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.radiusS, style: .continuous)
+                        .fill(isActiveFile ? Color.appAccent.opacity(0.15) : Color.clear)
+                )
+            }
+            .buttonStyle(.plain)
+            
+            if node.isFolder && isExpanded {
+                ForEach(children) { child in
+                    ServerFileTreeNodeView(node: child, vm: vm, level: level + 1)
+                }
+            }
+        }
+        .onAppear {
+            if node.isFolder && isExpanded {
+                loadChildren()
+            }
+        }
+    }
+    
+    private func toggleFolder() {
+        if isExpanded {
+            vm.expandedServerPaths.remove(node.path)
+        } else {
+            vm.expandedServerPaths.insert(node.path)
+            loadChildren()
+        }
+    }
+    
+    private func loadChildren() {
+        if let cached = node.children {
+            children = cached
+            return
+        }
+        
+        isLoading = true
+        vm.loadServerChildren(for: node) { loadedChildren in
+            self.children = loadedChildren
+            self.isLoading = false
+        }
+    }
+    
+    private func iconForNode() -> String {
+        if node.isFolder {
+            return isExpanded ? "folder.fill" : "folder"
+        }
+        let ext = (node.name as NSString).pathExtension.lowercased()
+        let imageExtensions = ["png", "jpg", "jpeg", "gif", "svg", "ico", "bmp", "webp"]
+        if imageExtensions.contains(ext) { return "photo.fill" }
+        if ext == "pdf" { return "doc.richtext.fill" }
+        if ["swift", "js", "py", "java", "cpp", "c", "h"].contains(ext) { return "doc.text.fill" }
+        return "doc"
+    }
+    
+    private func colorForNode() -> Color {
+        if node.isFolder { return .appAccent }
+        let ext = (node.name as NSString).pathExtension.lowercased()
+        let imageExtensions = ["png", "jpg", "jpeg", "gif", "svg", "ico", "bmp", "webp"]
+        if imageExtensions.contains(ext) { return .pink }
+        if ext == "pdf" { return .red }
+        if ext == "swift" { return .orange }
+        if ext == "js" { return .yellow }
+        if ext == "py" { return .blue }
+        return .appTextSecondary
+    }
+}
+
+struct ServerFileRowView: View {
+    let file: ServerFileNode
+    @ObservedObject var vm: WorkspaceViewModel
+    
+    var body: some View {
+        Button(action: {
+            if !file.isFolder {
+                vm.openServerFile(file)
+            }
+        }) {
+            HStack(spacing: Theme.spacingS) {
+                Image(systemName: file.isFolder ? "folder.fill" : iconForFile(file.name))
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(file.isFolder ? Color.appAccent : colorForFile(file.name))
+                    .frame(width: 20)
+                
+                Text(file.name)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.appTextPrimary)
+                    .lineLimit(1)
+                
+                Spacer()
+            }
+            .padding(.horizontal, Theme.spacingM)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: Theme.radiusS, style: .continuous)
+                    .fill(Color.clear)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private func openServerFile() {
+        let requestBody: [String: Any] = [:]
+        let command = "/get_file?file_path=\(file.path.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? file.path)"
+        
+        ServerManager.shared.executeServerCommand(command: command, method: "GET", body: requestBody, waitTime: 5) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let response):
+                    if let json = response as? [String: Any],
+                       let status = json["status"] as? String, status == "File content retrieved",
+                       let content = json["content"] as? String,
+                       let type = json["type"] as? String {
+                        
+                        if type == "text" {
+                            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(file.name)
+                            try? content.write(to: tempURL, atomically: true, encoding: .utf8)
+                            
+                            if vm.openFiles.contains(where: { $0.id == tempURL.path }) {
+                                vm.activeFileID = tempURL.path
+                            } else {
+                                let openFile = WorkspaceViewModel.OpenFile(
+                                    url: tempURL,
+                                    content: content,
+                                    isDirty: false
+                                )
+                                vm.openFiles.append(openFile)
+                                vm.activeFileID = openFile.id
+                            }
+                        }
+                    }
+                case .failure(let error):
+                    print("Failed to open server file: \(error)")
+                }
+            }
+        }
+    }
+    
+    private func iconForFile(_ fileName: String) -> String {
+        let ext = (fileName as NSString).pathExtension.lowercased()
+        let imageExtensions = ["png", "jpg", "jpeg", "gif", "svg", "ico", "bmp", "webp"]
+        if imageExtensions.contains(ext) { return "photo.fill" }
+        if ext == "pdf" { return "doc.richtext.fill" }
+        return "doc.text.fill"
+    }
+    
+    private func colorForFile(_ fileName: String) -> Color {
+        let ext = (fileName as NSString).pathExtension.lowercased()
+        let imageExtensions = ["png", "jpg", "jpeg", "gif", "svg", "ico", "bmp", "webp"]
+        if imageExtensions.contains(ext) { return .pink }
+        if ext == "pdf" { return .red }
+        return .appTextSecondary
     }
 }

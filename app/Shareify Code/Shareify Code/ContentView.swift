@@ -9,6 +9,9 @@ struct ContentView: View {
     @State private var hoverSharAI = false
     @State private var showSettings = false
     @State private var aiEnabled = true
+    @State private var isServerConnected = false
+    @State private var showFolderSourcePicker = false
+    @State private var showServerBrowser = false
     
     var body: some View {
         ZStack(alignment: .trailing) {
@@ -25,8 +28,35 @@ struct ContentView: View {
                     Spacer()
                     
                     if !showSharAI {
+                        if isServerConnected {
+                            HStack(spacing: Theme.spacingXS) {
+                                Circle()
+                                    .fill(Color.green)
+                                    .frame(width: 8, height: 8)
+                                Text("Server")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(Color.appTextSecondary)
+                            }
+                            .padding(.horizontal, Theme.spacingM)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule()
+                                    .fill(Color.appSurface)
+                            )
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color.appBorder, lineWidth: 1)
+                            )
+                            .shadow(color: Theme.subtleShadow, radius: 8, x: 0, y: 2)
+                            .transition(.opacity)
+                        }
+                        
                         Button(action: {
-                            vm.openFolder()
+                            if isServerConnected {
+                                showFolderSourcePicker = true
+                            } else {
+                                vm.openFolder()
+                            }
                         }) {
                             Image(systemName: "folder.badge.plus")
                                 .font(.system(size: 16, weight: .medium))
@@ -149,6 +179,9 @@ struct ContentView: View {
         }
         .animation(.spring(response: Theme.animationNormal, dampingFraction: 0.8), value: showSharAI)
         .animation(.spring(response: Theme.animationNormal, dampingFraction: 0.8), value: aiEnabled)
+        .onAppear {
+            checkServerConnection()
+        }
         .onChange(of: aiEnabled) { oldValue, newValue in
             if !newValue {
                 showSharAI = false
@@ -178,6 +211,42 @@ struct ContentView: View {
                     UnsavedWarningDialog(vm: vm)
                         .transition(.scale(scale: 0.95).combined(with: .opacity))
                 }
+                
+                if showFolderSourcePicker {
+                    Color.black.opacity(0.5)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                                showFolderSourcePicker = false
+                            }
+                        }
+                        .transition(.opacity)
+                    
+                    FolderSourcePicker(
+                        isPresented: $showFolderSourcePicker,
+                        onLocalSelected: {
+                            vm.openFolder()
+                        },
+                        onServerSelected: {
+                            openServerBrowser()
+                        }
+                    )
+                    .transition(.scale(scale: 0.95).combined(with: .opacity))
+                }
+                
+                if showServerBrowser {
+                    Color.black.opacity(0.5)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                                showServerBrowser = false
+                            }
+                        }
+                        .transition(.opacity)
+                    
+                    ServerBrowserView(isPresented: $showServerBrowser)
+                        .transition(.scale(scale: 0.95).combined(with: .opacity))
+                }
             }
         )
         .background(
@@ -205,12 +274,187 @@ struct ContentView: View {
         ) { result in
             switch result {
             case .success(let urls):
-                if let url = urls.first { vm.setRootFromPickedURL(url) }
+                if let url = urls.first {
+                    vm.setRootFromPickedURL(url)
+                }
             case .failure(let error):
                 print("Folder import error: \(error)")
             }
         }
         #endif
+        .onAppear {
+            checkServerConnection()
+        }
+    }
+    
+    private func checkServerConnection() {
+        guard ServerManager.shared.isServerLoggedIn() else {
+            isServerConnected = false
+            return
+        }
+        
+        ServerManager.shared.testServerConnection { isOnline in
+            isServerConnected = isOnline
+        }
+    }
+    
+    private func openServerBrowser() {
+        showFolderSourcePicker = false
+        withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+            showServerBrowser = true
+        }
+    }
+}
+
+struct FolderSourcePicker: View {
+    @Binding var isPresented: Bool
+    let onLocalSelected: () -> Void
+    let onServerSelected: () -> Void
+    
+    var body: some View {
+        VStack(spacing: Theme.spacingXL) {
+            VStack(spacing: Theme.spacingM) {
+                ZStack {
+                    Circle()
+                        .fill(Color.appAccent.opacity(0.15))
+                        .frame(width: 64, height: 64)
+                    
+                    Image(systemName: "folder.badge.plus")
+                        .font(.system(size: 32, weight: .medium))
+                        .foregroundStyle(Color.appAccent)
+                }
+                
+                Text("Open Folder")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(Color.appTextPrimary)
+                
+                Text("Choose where to open from")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.appTextSecondary)
+            }
+            
+            VStack(spacing: Theme.spacingM) {
+                Button(action: {
+                    isPresented = false
+                    onLocalSelected()
+                }) {
+                    HStack(spacing: Theme.spacingM) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: Theme.radiusS, style: .continuous)
+                                .fill(Color.blue.opacity(0.15))
+                                .frame(width: 48, height: 48)
+                            
+                            Image(systemName: "laptopcomputer")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(Color.blue)
+                        }
+                        
+                        VStack(alignment: .leading, spacing: Theme.spacingXS) {
+                            Text("Local Folder")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Color.appTextPrimary)
+                            
+                            Text("Open from this device")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Color.appTextSecondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.appTextTertiary)
+                    }
+                    .padding(Theme.spacingL)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
+                            .fill(Color.appSurfaceElevated)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
+                            .stroke(Color.appBorder, lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                
+                Button(action: {
+                    isPresented = false
+                    onServerSelected()
+                }) {
+                    HStack(spacing: Theme.spacingM) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: Theme.radiusS, style: .continuous)
+                                .fill(Color.green.opacity(0.15))
+                                .frame(width: 48, height: 48)
+                            
+                            Image(systemName: "server.rack")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(Color.green)
+                        }
+                        
+                        VStack(alignment: .leading, spacing: Theme.spacingXS) {
+                            Text("Server Folder")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Color.appTextPrimary)
+                            
+                            Text("Browse files on your server")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Color.appTextSecondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.appTextTertiary)
+                    }
+                    .padding(Theme.spacingL)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
+                            .fill(Color.appSurfaceElevated)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
+                            .stroke(Color.appBorder, lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+            
+            Button(action: {
+                withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                    isPresented = false
+                }
+            }) {
+                Text("Cancel")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Color.appTextSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Theme.spacingM)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
+                            .fill(Color.appSurfaceElevated)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
+                                    .stroke(Color.appBorder, lineWidth: 1)
+                            )
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(Theme.spacingXXL)
+        .frame(width: 440)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.radiusXL, style: .continuous)
+                .fill(Color.appSurface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.radiusXL, style: .continuous)
+                .stroke(Color.appBorder, lineWidth: 1)
+        )
+        .shadow(color: Theme.panelShadow, radius: 32, x: 0, y: 16)
     }
 }
 
