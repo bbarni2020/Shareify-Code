@@ -224,6 +224,9 @@ struct LoginSheet: View {
     let onLogin: (String) -> Void
     @State private var usernameInput = ""
     @State private var passwordInput = ""
+    @State private var isLoading = false
+    @State private var errorMessage = ""
+    @State private var showError = false
     @FocusState private var focusedField: Field?
     
     enum Field {
@@ -292,6 +295,19 @@ struct LoginSheet: View {
                         )
                         .focused($focusedField, equals: .password)
                 }
+                
+                if showError {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.red)
+                            .font(.system(size: 12))
+                        Text(errorMessage)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.red)
+                        Spacer()
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
             }
             
             HStack(spacing: Theme.spacingM) {
@@ -313,25 +329,30 @@ struct LoginSheet: View {
                         )
                 }
                 .buttonStyle(.plain)
+                .disabled(isLoading)
                 
                 Button(action: {
-                    if !usernameInput.isEmpty {
-                        onLogin(usernameInput)
-                        isPresented = false
-                    }
+                    performLogin()
                 }) {
-                    Text("Sign In")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(usernameInput.isEmpty ? Color.appTextTertiary : Color.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, Theme.spacingM)
-                        .background(
-                            RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
-                                .fill(usernameInput.isEmpty ? Color.appSurfaceElevated : Color.appAccent)
-                        )
+                    HStack(spacing: 8) {
+                        if isLoading {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(0.8)
+                        }
+                        Text(isLoading ? "Signing In..." : "Sign In")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(usernameInput.isEmpty || isLoading ? Color.appTextTertiary : Color.white)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Theme.spacingM)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
+                            .fill(usernameInput.isEmpty || isLoading ? Color.appSurfaceElevated : Color.appAccent)
+                    )
                 }
                 .buttonStyle(.plain)
-                .disabled(usernameInput.isEmpty)
+                .disabled(usernameInput.isEmpty || isLoading)
             }
         }
         .padding(Theme.spacingXXL)
@@ -345,6 +366,36 @@ struct LoginSheet: View {
         .shadow(color: Theme.panelShadow, radius: 32, x: 0, y: 16)
         .onAppear {
             focusedField = .username
+        }
+    }
+    
+    private func performLogin() {
+        focusedField = nil
+        
+        withAnimation(.easeInOut(duration: 0.3)) {
+            showError = false
+            isLoading = true
+        }
+        
+        ServerManager.shared.loginToServer(username: usernameInput, password: passwordInput) { result in
+            switch result {
+            case .success(_):
+                UserDefaults.standard.set(usernameInput, forKey: "server_username")
+                UserDefaults.standard.set(passwordInput, forKey: "server_password")
+                UserDefaults.standard.synchronize()
+                
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    isLoading = false
+                    onLogin(usernameInput)
+                    isPresented = false
+                }
+            case .failure(let error):
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    isLoading = false
+                    showError = true
+                    errorMessage = error.localizedDescription
+                }
+            }
         }
     }
 }

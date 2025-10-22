@@ -1,17 +1,86 @@
 import Foundation
 
-enum AIActionType {
+enum AIActionType: Codable {
     case edit(old: String, new: String)
     case rewrite(file: String, content: String)
     case insert(after: String, content: String)
     case terminal(command: String, reason: String)
     case search(pattern: String, reason: String)
+    
+    enum CodingKeys: String, CodingKey {
+        case type, old, new, file, content, after, command, reason, pattern
+    }
+    
+    enum ActionKind: String, Codable {
+        case edit, rewrite, insert, terminal, search
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let type = try container.decode(ActionKind.self, forKey: .type)
+        
+        switch type {
+        case .edit:
+            let old = try container.decode(String.self, forKey: .old)
+            let new = try container.decode(String.self, forKey: .new)
+            self = .edit(old: old, new: new)
+        case .rewrite:
+            let file = try container.decode(String.self, forKey: .file)
+            let content = try container.decode(String.self, forKey: .content)
+            self = .rewrite(file: file, content: content)
+        case .insert:
+            let after = try container.decode(String.self, forKey: .after)
+            let content = try container.decode(String.self, forKey: .content)
+            self = .insert(after: after, content: content)
+        case .terminal:
+            let command = try container.decode(String.self, forKey: .command)
+            let reason = try container.decode(String.self, forKey: .reason)
+            self = .terminal(command: command, reason: reason)
+        case .search:
+            let pattern = try container.decode(String.self, forKey: .pattern)
+            let reason = try container.decode(String.self, forKey: .reason)
+            self = .search(pattern: pattern, reason: reason)
+        }
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        
+        switch self {
+        case .edit(let old, let new):
+            try container.encode(ActionKind.edit, forKey: .type)
+            try container.encode(old, forKey: .old)
+            try container.encode(new, forKey: .new)
+        case .rewrite(let file, let content):
+            try container.encode(ActionKind.rewrite, forKey: .type)
+            try container.encode(file, forKey: .file)
+            try container.encode(content, forKey: .content)
+        case .insert(let after, let content):
+            try container.encode(ActionKind.insert, forKey: .type)
+            try container.encode(after, forKey: .after)
+            try container.encode(content, forKey: .content)
+        case .terminal(let command, let reason):
+            try container.encode(ActionKind.terminal, forKey: .type)
+            try container.encode(command, forKey: .command)
+            try container.encode(reason, forKey: .reason)
+        case .search(let pattern, let reason):
+            try container.encode(ActionKind.search, forKey: .type)
+            try container.encode(pattern, forKey: .pattern)
+            try container.encode(reason, forKey: .reason)
+        }
+    }
 }
 
-struct AIAction: Identifiable {
-    let id = UUID()
+struct AIAction: Identifiable, Codable {
+    let id: UUID
     let type: AIActionType
     let rawText: String
+    
+    init(id: UUID = UUID(), type: AIActionType, rawText: String) {
+        self.id = id
+        self.type = type
+        self.rawText = rawText
+    }
 }
 
 final class AIActionParser {
