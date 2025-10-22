@@ -386,7 +386,7 @@ final class WorkspaceViewModel: ObservableObject {
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("server_\(file.path.replacingOccurrences(of: "/", with: "_"))")
         let serverTitle = "server\(file.path)"
  
-        if let idx = openFiles.firstIndex(where: { $0.id == tempURL.path }) {
+        if openFiles.contains(where: { $0.id == tempURL.path }) {
             activeFileID = tempURL.path
             return
         }
