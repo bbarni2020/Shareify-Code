@@ -34,8 +34,8 @@ struct CodeEditorView: UIViewRepresentable {
         textView.smartInsertDeleteType = UITextSmartInsertDeleteType.no
         textView.keyboardType = UIKeyboardType.default
         textView.keyboardAppearance = UIKeyboardAppearance.dark
-        textView.backgroundColor = UIColor(white: 0.12, alpha: 1.0)
-        textView.textColor = UIColor(red: 0.929, green: 0.929, blue: 0.929, alpha: 1.0)
+        textView.backgroundColor = UIColor(red: 0.059, green: 0.059, blue: 0.071, alpha: 1.0)
+        textView.textColor = UIColor(red: 0.961, green: 0.961, blue: 0.969, alpha: 1.0)
         textView.font = UIFont.monospacedSystemFont(ofSize: 14, weight: .regular)
         textView.textContainerInset = UIEdgeInsets(top: 12, left: 8, bottom: 12, right: 8)
         
