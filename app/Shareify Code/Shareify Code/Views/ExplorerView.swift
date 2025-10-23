@@ -151,11 +151,17 @@ struct ExplorerView: View {
                     }
                     .buttonStyle(.plain)
                     .confirmationDialog("Choose folder source", isPresented: $showFolderSourcePicker) {
-                        Button("Local / On Device") {
+                        Button {
                             vm.openFolder()
+                        } label: {
+                            Text("Local / On Device")
+                                .foregroundStyle(Color.white)
                         }
-                        Button("Server") {
+                        Button {
                             showServerBrowser = true
+                        } label: {
+                            Text("Server")
+                                .foregroundStyle(Color.white)
                         }
                         Button("Cancel", role: .cancel) {}
                     }
