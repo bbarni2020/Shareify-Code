@@ -7,60 +7,58 @@
 
 import SwiftUI
 import UIKit
-import Highlightr
 
 struct CodeEditorView: UIViewRepresentable {
     @Binding var text: String
-    let language: String
+    let language: ProgrammingLanguage
     
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
     
     func makeUIView(context: Context) -> UITextView {
-        let textView = UITextView()
+        let storage = HighlightingTextStorage(language: language, theme: .xcodeDefault)
+        let layoutManager = NSLayoutManager()
+        let textContainer = NSTextContainer(size: CGSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
+        textContainer.widthTracksTextView = true
+        
+        storage.addLayoutManager(layoutManager)
+        layoutManager.addTextContainer(textContainer)
+        
+        let textView = UITextView(frame: .zero, textContainer: textContainer)
         textView.delegate = context.coordinator
-        textView.autocorrectionType = .no
-        textView.autocapitalizationType = .none
-        textView.smartDashesType = .no
-        textView.smartQuotesType = .no
-        textView.smartInsertDeleteType = .no
-        textView.keyboardType = .default
-        textView.keyboardAppearance = .dark
-        textView.backgroundColor = .clear
-
-
-        if let highlightr = context.coordinator.highlightr {
-            highlightr.setTheme(to: "atom-one-dark")
-            highlightr.theme.setCodeFont(UIFont.monospacedSystemFont(ofSize: 14, weight: .regular))
-
-            let storage = CodeAttributedString(highlightr: highlightr)
-            storage.language = language
-            
-            let layoutManager = textView.layoutManager
-            layoutManager.textStorage?.removeLayoutManager(layoutManager)
-            storage.addLayoutManager(layoutManager)
-            
-            textView.text = text
-        } else {
-            textView.font = UIFont.monospacedSystemFont(ofSize: 14, weight: .regular)
-            textView.text = text
+        textView.autocorrectionType = UITextAutocorrectionType.no
+        textView.autocapitalizationType = UITextAutocapitalizationType.none
+        textView.smartDashesType = UITextSmartDashesType.no
+        textView.smartQuotesType = UITextSmartQuotesType.no
+        textView.smartInsertDeleteType = UITextSmartInsertDeleteType.no
+        textView.keyboardType = UIKeyboardType.default
+        textView.keyboardAppearance = UIKeyboardAppearance.dark
+        textView.backgroundColor = UIColor(white: 0.12, alpha: 1.0)
+        textView.textColor = UIColor(red: 0.929, green: 0.929, blue: 0.929, alpha: 1.0)
+        textView.font = UIFont.monospacedSystemFont(ofSize: 14, weight: .regular)
+        textView.textContainerInset = UIEdgeInsets(top: 12, left: 8, bottom: 12, right: 8)
+        
+        if !text.isEmpty {
+            storage.replaceCharacters(in: NSRange(location: 0, length: 0), with: text)
         }
         
         return textView
     }
     
     func updateUIView(_ textView: UITextView, context: Context) {
-        if let storage = textView.textStorage as? CodeAttributedString {
-            if storage.language != language {
-                storage.language = language
-            }
+        if let storage = textView.textStorage as? HighlightingTextStorage {
+            storage.updateLanguage(language)
         }
         
         if textView.text != text && !context.coordinator.isUpdating {
             let selectedRange = textView.selectedRange
             
-            textView.text = text
+            if let storage = textView.textStorage as? HighlightingTextStorage {
+                storage.replaceCharacters(in: NSRange(location: 0, length: storage.length), with: text)
+            } else {
+                textView.text = text
+            }
             
             if selectedRange.location <= text.count {
                 textView.selectedRange = selectedRange
@@ -71,7 +69,6 @@ struct CodeEditorView: UIViewRepresentable {
     final class Coordinator: NSObject, UITextViewDelegate {
         var parent: CodeEditorView
         var isUpdating = false
-        let highlightr = Highlightr()
         
         init(_ parent: CodeEditorView) {
             self.parent = parent

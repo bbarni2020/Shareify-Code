@@ -87,9 +87,12 @@ final class CodeSyntaxHighlighter {
         let text = storage.string
         let ns = text as NSString
         let full = NSRange(location: 0, length: ns.length)
-        let protect = protectedRanges(in: text)
+        let protect = protectedRanges(in: text, language: language)
         apply(pattern: commentBlockPattern, color: .systemGray, to: storage, in: text)
-        apply(pattern: commentLinePattern, color: .systemGray, to: storage, in: text)
+        
+        let commentPattern = commentLinePattern(for: language)
+        apply(pattern: commentPattern, color: .systemGray, to: storage, in: text)
+        
         apply(pattern: stringPattern, color: .systemGreen, to: storage, in: text)
         apply(pattern: multilineStringPattern, color: .systemGreen, to: storage, in: text)
         apply(pattern: numberPattern, color: .systemOrange, to: storage, in: text, skipping: protect)
@@ -165,9 +168,10 @@ final class CodeSyntaxHighlighter {
         return false
     }
 
-    func protectedRanges(in text: String) -> [NSRange] {
+    func protectedRanges(in text: String, language: ProgrammingLanguage) -> [NSRange] {
         var res: [NSRange] = []
-        let patterns = [multilineStringPattern, stringPattern, commentBlockPattern, commentLinePattern]
+        let commentPattern = commentLinePattern(for: language)
+        let patterns = [multilineStringPattern, stringPattern, commentBlockPattern, commentPattern]
         for p in patterns {
             let rx = try? NSRegularExpression(pattern: p, options: [.dotMatchesLineSeparators, .anchorsMatchLines])
             enumerate(regex: rx, in: text) { r in res.append(r) }
@@ -178,11 +182,21 @@ final class CodeSyntaxHighlighter {
     func escape(_ s: String) -> String {
         NSRegularExpression.escapedPattern(for: s)
     }
+    
+    func commentLinePattern(for language: ProgrammingLanguage) -> String {
+        switch language {
+        case .python, .ruby, .shell, .yaml, .perl, .r:
+            return "(?m)#.*$"
+        case .c, .cpp, .java, .javascript, .typescript, .swift, .rust, .go, .kotlin, .csharp, .scala, .dart, .php:
+            return "(?m)(?<!:)//.*$"
+        default:
+            return "(?m)(?<!:)//.*$|(?m)#.*$"
+        }
+    }
 }
 
 let stringPattern = "\"(?:\\\\.|[^\"\\\\])*\""
 let multilineStringPattern = "\"\"\"[\\n\\r\\s\\S]*?\"\"\""
-let commentLinePattern = "(?m)//.*$|(?m)#.*$"
 let commentBlockPattern = "/\\*[\\n\\r\\s\\S]*?\\*/"
 let numberPattern = "\\b(?:0x[0-9A-Fa-f_]+|0b[01_]+|0o[0-7_]+|[0-9][0-9_]*(?:\\.[0-9_]+)?)\\b"
 let attributePattern = "@[_A-Za-z][_A-Za-z0-9]*"

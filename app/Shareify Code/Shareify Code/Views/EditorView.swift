@@ -65,6 +65,22 @@ struct EditorView: View {
                         .padding(.horizontal, Theme.spacingL)
                         .padding(.bottom, Theme.spacingL)
                     } else if active.url.detectedLanguage != .unknown {
+                        #if os(iOS)
+                        CodeEditorView(
+                            text: Binding<String>(
+                                get: { active.content },
+                                set: { vm.updateActiveContent($0) }
+                            ),
+                            language: active.url.detectedLanguage
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusL, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.radiusL, style: .continuous)
+                                .stroke(Color.appBorder, lineWidth: 1)
+                        )
+                        .padding(.horizontal, Theme.spacingL)
+                        .padding(.bottom, Theme.spacingL)
+                        #else
                         SyntaxHighlightingTextEditor(
                             text: Binding<String>(
                                 get: { active.content },
@@ -81,6 +97,7 @@ struct EditorView: View {
                         )
                         .padding(.horizontal, Theme.spacingL)
                         .padding(.bottom, Theme.spacingL)
+                        #endif
                     } else {
                         MediaContentView(file: active)
                             .padding(.horizontal, Theme.spacingL)
