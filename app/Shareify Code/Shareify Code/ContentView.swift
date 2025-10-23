@@ -10,6 +10,7 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var aiEnabled = true
     @State private var isServerConnected = false
+    @State private var isSignedIn = false
     @State private var showFolderSourcePicker = false
     @State private var showServerBrowser = false
     
@@ -105,7 +106,7 @@ struct ContentView: View {
             }
             .zIndex(2)
             
-            if showSharAI && aiEnabled {
+            if showSharAI && aiEnabled && isSignedIn {
                 SharAIView(vm: vm, isOpen: $showSharAI)
                     .transition(.asymmetric(
                         insertion: .move(edge: .trailing).combined(with: .opacity),
@@ -116,7 +117,7 @@ struct ContentView: View {
                     .padding(.vertical, Theme.spacingM)
             }
             
-            if !showSharAI && aiEnabled {
+            if !showSharAI && aiEnabled && isSignedIn {
                 VStack {
                     Spacer()
                     Button(action: { 
@@ -182,7 +183,15 @@ struct ContentView: View {
         .onAppear {
             checkServerConnection()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerLoginStatusChanged"))) { _ in
+            checkServerConnection()
+        }
         .onChange(of: aiEnabled) { oldValue, newValue in
+            if !newValue {
+                showSharAI = false
+            }
+        }
+        .onChange(of: isSignedIn) { oldValue, newValue in
             if !newValue {
                 showSharAI = false
             }
@@ -288,7 +297,8 @@ struct ContentView: View {
     }
     
     private func checkServerConnection() {
-        guard ServerManager.shared.isServerLoggedIn() else {
+        isSignedIn = ServerManager.shared.isServerLoggedIn()
+        guard isSignedIn else {
             isServerConnected = false
             return
         }

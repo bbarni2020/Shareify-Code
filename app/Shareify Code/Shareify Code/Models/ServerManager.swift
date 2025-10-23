@@ -315,6 +315,7 @@ class ServerManager {
                             if let token = jsonDict["token"] as? String {
                                 UserDefaults.standard.set(token, forKey: "shareify_jwt")
                                 UserDefaults.standard.synchronize()
+                                NotificationCenter.default.post(name: NSNotification.Name("ServerLoginStatusChanged"), object: nil)
                             }
                             completion(.success(jsonDict))
                         } else {
@@ -389,6 +390,7 @@ class ServerManager {
                                 UserDefaults.standard.set(email, forKey: "user_email")
                                 UserDefaults.standard.set(password, forKey: "user_password")
                                 UserDefaults.standard.synchronize()
+                                NotificationCenter.default.post(name: NSNotification.Name("ServerLoginStatusChanged"), object: nil)
                             }
                             completion(.success(jsonDict))
                         } else {
