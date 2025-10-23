@@ -129,6 +129,10 @@ final class SyntaxHighlighter {
             return ["break","case","chan","const","continue","default","defer","else","fallthrough","for","func","go","goto","if","import","interface","map","package","range","return","select","struct","switch","type","var"]
         case .kotlin:
             return ["as","break","class","continue","do","else","false","for","fun","if","in","interface","is","null","object","package","return","super","this","throw","true","try","typealias","val","var","when","while","by","catch","constructor","delegate","dynamic","field","file","finally","get","import","init","param","property","receiver","set","setparam","value","where"]
+        case .html:
+            return ["DOCTYPE","html","head","title","meta","link","style","script","body","div","span","p","a","img","ul","ol","li","table","tr","td","th","thead","tbody","tfoot","form","input","button","select","option","textarea","label","header","footer","nav","section","article","aside","main","figure","figcaption","video","audio","source","canvas","svg","iframe","br","hr","strong","em","b","i","u","small","sup","sub","code","pre","blockquote","h1","h2","h3","h4","h5","h6"]
+        case .css:
+            return ["important","absolute","relative","fixed","sticky","flex","grid","block","inline","inline-block","none","hidden","visible","auto","inherit","initial","unset","bold","normal","italic","underline","left","right","center","top","bottom","middle","uppercase","lowercase","capitalize","before","after","hover","active","focus","visited","first-child","last-child","nth-child","rgba","rgb","hsl","hsla","calc","var","linear-gradient","radial-gradient","transparent","solid","dashed","dotted","double","from","to","animation","transition","transform","scale","rotate","translate","skew","matrix"]
         default:
             return []
         }
@@ -138,6 +142,10 @@ final class SyntaxHighlighter {
         switch language {
         case .python, .ruby, .shell, .yaml, .perl, .r:
             return "(?m)#.*$"
+        case .html, .xml:
+            return "<!--[\\s\\S]*?-->"
+        case .css:
+            return "(?m)(?<!:)//.*$"
         case .c, .cpp, .java, .javascript, .typescript, .swift, .rust, .go, .kotlin, .csharp, .scala, .dart, .php:
             return "(?m)(?<!:)//.*$"
         default:
