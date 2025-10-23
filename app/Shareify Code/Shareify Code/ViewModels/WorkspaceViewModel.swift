@@ -36,15 +36,87 @@ final class WorkspaceViewModel: ObservableObject {
         var isLoading: Bool = false
         var cursorLine: Int = 1
         var cursorColumn: Int = 1
+        var binaryData: Data?
+        var isServerFile: Bool = false
+        
+        var fileType: FileType {
+            let ext = url.pathExtension.lowercased()
+            if ["png", "jpg", "jpeg", "gif", "svg", "bmp", "webp", "ico", "heic"].contains(ext) {
+                return .image
+            } else if ["mp4", "mov", "avi", "mkv", "m4v", "webm"].contains(ext) {
+                return .video
+            } else if ["mp3", "wav", "m4a", "aac", "flac", "ogg"].contains(ext) {
+                return .audio
+            } else if ext == "pdf" {
+                return .pdf
+            } else {
+                return .text
+            }
+        }
+        
+        enum FileType {
+            case text
+            case image
+            case video
+            case audio
+            case pdf
+        }
+    }
+    
+    struct Note: Identifiable, Codable {
+        let id: UUID
+        var title: String
+        var drawingData: Data
+        var createdAt: Date
+        var modifiedAt: Date
+        
+        init(id: UUID = UUID(), title: String, drawingData: Data = Data(), createdAt: Date = Date(), modifiedAt: Date = Date()) {
+            self.id = id
+            self.title = title
+            self.drawingData = drawingData
+            self.createdAt = createdAt
+            self.modifiedAt = modifiedAt
+        }
     }
 
     @Published var openFiles: [OpenFile] = []
     @Published var activeFileID: String?
     @Published var fileToClose: String?
     @Published var showUnsavedWarning = false
+    @Published var notes: [Note] = []
+    @Published var showNotesView = false
     
     init() {
         loadCacheFromUserDefaults()
+        loadNotes()
+        checkServerAvailabilityForCache()
+    }
+    
+    private func checkServerAvailabilityForCache() {
+        if isServerFolder, let _ = serverFolderPath {
+            ServerManager.shared.testServerConnection { isOnline in
+                DispatchQueue.main.async {
+                    if !isOnline {
+                        self.clearServerFolderAndShowDefault()
+                    }
+                }
+            }
+        }
+    }
+    
+    private func clearServerFolderAndShowDefault() {
+        rootURL = nil
+        rootNode = nil
+        expanded = []
+        isServerFolder = false
+        serverFolderPath = nil
+        serverRootNode = nil
+        expandedServerPaths = []
+        openFiles = []
+        activeFileID = nil
+        
+        UserDefaults.standard.removeObject(forKey: "lastServerFolderPath")
+        UserDefaults.standard.set(false, forKey: "wasServerFolder")
     }
 
     func collapseAll() {
@@ -82,6 +154,9 @@ final class WorkspaceViewModel: ObservableObject {
     }
 
     func loadRoot(_ url: URL) {
+        rootURL = nil
+        rootNode = nil
+        expanded = []
         isServerFolder = false
         serverFolderPath = nil
         serverRootNode = nil
@@ -92,11 +167,13 @@ final class WorkspaceViewModel: ObservableObject {
         openFiles = []
         activeFileID = nil
         
-        rootURL = url
-        rootNode = FileNode.makeRoot(from: url, showHidden: showHiddenFiles)
-        expanded = [url.path]
-
-        UserDefaults.standard.set(url.path, forKey: "lastLocalFolderPath")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.rootURL = url
+            self.rootNode = FileNode.makeRoot(from: url, showHidden: self.showHiddenFiles)
+            self.expanded = [url.path]
+            
+            UserDefaults.standard.set(url.path, forKey: "lastLocalFolderPath")
+        }
     }
 
     func setRootFromPickedURL(_ url: URL) {
@@ -123,6 +200,12 @@ final class WorkspaceViewModel: ObservableObject {
     
     func createFile(name: String, in parentNode: FileNode?) {
         guard !name.isEmpty else { return }
+        
+        if isServerFolder {
+            createServerFile(name: name, in: parentNode)
+            return
+        }
+        
         let parent = parentNode ?? (rootNode != nil ? FileNode(url: rootURL!, isDirectory: true) : nil)
         guard let parent = parent, parent.isDirectory else { return }
         
@@ -140,6 +223,12 @@ final class WorkspaceViewModel: ObservableObject {
     
     func createFolder(name: String, in parentNode: FileNode?) {
         guard !name.isEmpty else { return }
+        
+        if isServerFolder {
+            createServerFolder(name: name, in: parentNode)
+            return
+        }
+        
         let parent = parentNode ?? (rootNode != nil ? FileNode(url: rootURL!, isDirectory: true) : nil)
         guard let parent = parent, parent.isDirectory else { return }
         
@@ -155,6 +244,100 @@ final class WorkspaceViewModel: ObservableObject {
             refreshNode(parent)
         } catch {
             print("Folder creation failed: \(error)")
+        }
+    }
+    
+    func deleteFile(_ node: FileNode) {
+        if isServerFolder {
+            deleteServerFile(node)
+            return
+        }
+        
+        #if os(iOS)
+        let accessing = node.url.startAccessingSecurityScopedResource()
+        defer { if accessing { node.url.stopAccessingSecurityScopedResource() } }
+        #endif
+        
+        do {
+            try FileManager.default.removeItem(at: node.url)
+            
+            if let idx = openFiles.firstIndex(where: { $0.url == node.url }) {
+                openFiles.remove(at: idx)
+                if activeFileID == node.url.path {
+                    activeFileID = openFiles.last?.id
+                }
+            }
+            
+            if let rootURL {
+                rootNode = FileNode.makeRoot(from: rootURL, showHidden: showHiddenFiles)
+            }
+        } catch {
+            print("Delete failed: \(error)")
+        }
+    }
+    
+    func deleteServerFileNode(_ node: ServerFileNode) {
+        guard isServerFolder else { return }
+        
+        let command = node.isFolder ? "/api/delete_folder" : "/api/delete_file"
+        let requestBody: [String: Any] = ["path": node.path]
+        
+        ServerManager.shared.executeServerCommand(command: command, method: "POST", body: requestBody, waitTime: 3) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(_):
+                    let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("server_\(node.path.replacingOccurrences(of: "/", with: "_"))")
+                    
+                    if let idx = self.openFiles.firstIndex(where: { $0.url.path == tempURL.path }) {
+                        self.openFiles.remove(at: idx)
+                        if self.activeFileID == tempURL.path {
+                            self.activeFileID = self.openFiles.last?.id
+                        }
+                    }
+                    
+                    self.serverFileContentCache.removeValue(forKey: node.path)
+                    
+                    if let serverPath = self.serverFolderPath {
+                        self.serverFolderCache.removeValue(forKey: serverPath)
+                        self.refreshServerFolder()
+                    }
+                    
+                case .failure(let error):
+                    print("Failed to delete server file/folder: \(error)")
+                }
+            }
+        }
+    }
+    
+    private func deleteServerFile(_ node: FileNode) {
+        guard isServerFolder, let customTitle = openFiles.first(where: { $0.url.path.contains(node.url.lastPathComponent) })?.customTitle else { return }
+        
+        let filePath = customTitle.replacingOccurrences(of: "server", with: "")
+        
+        let requestBody: [String: Any] = ["path": filePath]
+        
+        ServerManager.shared.executeServerCommand(command: "/api/delete_file", method: "POST", body: requestBody, waitTime: 3) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(_):
+                    if let idx = self.openFiles.firstIndex(where: { $0.url == node.url }) {
+                        self.openFiles.remove(at: idx)
+                        if self.activeFileID == node.url.path {
+                            self.activeFileID = self.openFiles.last?.id
+                        }
+                    }
+                    
+                    self.serverFileContentCache.removeValue(forKey: filePath)
+                    
+                    if let serverPath = self.serverFolderPath {
+                        self.serverFolderCache.removeValue(forKey: serverPath)
+                        self.refreshServerFolder()
+                    }
+                    
+                case .failure(let error):
+                    print("Failed to delete server file: \(error)")
+                }
+            }
         }
     }
 
@@ -177,10 +360,24 @@ final class WorkspaceViewModel: ObservableObject {
             activeFileID = openFiles[existing].id
             return
         }
-    let content = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
-        let file = OpenFile(url: url, content: content)
-        openFiles.append(file)
-        activeFileID = file.id
+        
+        let ext = url.pathExtension.lowercased()
+        let binaryExtensions = ["png", "jpg", "jpeg", "gif", "bmp", "webp", "ico", "heic",
+                               "mp4", "mov", "avi", "mkv", "m4v", "webm",
+                               "mp3", "wav", "m4a", "aac", "flac", "ogg",
+                               "pdf"]
+        
+        if binaryExtensions.contains(ext) {
+            let binaryData = try? Data(contentsOf: url)
+            let file = OpenFile(url: url, content: "", binaryData: binaryData)
+            openFiles.append(file)
+            activeFileID = file.id
+        } else {
+            let content = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+            let file = OpenFile(url: url, content: content)
+            openFiles.append(file)
+            activeFileID = file.id
+        }
     }
 
     func closeFile(_ id: String) {
@@ -232,6 +429,12 @@ final class WorkspaceViewModel: ObservableObject {
     func saveActive() {
         guard let id = activeFileID, let idx = openFiles.firstIndex(where: { $0.id == id }) else { return }
         let f = openFiles[idx]
+        
+        if f.customTitle?.hasPrefix("server") == true {
+            saveServerFile(f)
+            return
+        }
+        
         do {
             try f.content.write(to: f.url, atomically: true, encoding: .utf8)
             openFiles[idx].isDirty = false
@@ -315,30 +518,36 @@ final class WorkspaceViewModel: ObservableObject {
     
     func loadServerFolder(path: String, files: [ServerFileNode]) {
         rootURL = nil
-        self.rootNode = nil
+        rootNode = nil
         expanded = []
+        isServerFolder = false
+        serverFolderPath = nil
+        serverRootNode = nil
+        expandedServerPaths = []
 
         saveOpenFilesCache()
 
         openFiles = []
         activeFileID = nil
-
-        isServerFolder = true
-        serverFolderPath = path
         
-        let serverRoot = ServerFileNode(
-            name: path.split(separator: "/").last.map(String.init) ?? "Root",
-            path: path,
-            isFolder: true,
-            children: files
-        )
-        
-        serverRootNode = serverRoot
-        serverFolderCache[path] = files
-        expandedServerPaths = [path]
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.isServerFolder = true
+            self.serverFolderPath = path
+            
+            let serverRoot = ServerFileNode(
+                name: path.split(separator: "/").last.map(String.init) ?? "Root",
+                path: path,
+                isFolder: true,
+                children: files
+            )
+            
+            self.serverRootNode = serverRoot
+            self.serverFolderCache[path] = files
+            self.expandedServerPaths = [path]
 
-        UserDefaults.standard.set(path, forKey: "lastServerFolderPath")
-        saveCacheToUserDefaults()
+            UserDefaults.standard.set(path, forKey: "lastServerFolderPath")
+            self.saveCacheToUserDefaults()
+        }
     }
     
     func loadServerChildren(for node: ServerFileNode, completion: @escaping ([ServerFileNode]) -> Void) {
@@ -376,7 +585,11 @@ final class WorkspaceViewModel: ObservableObject {
                     
                 case .failure(let error):
                     print("Failed to load server children: \(error)")
-                    completion([])
+                    if let cachedFallback = self.serverFolderCache[node.path] {
+                        completion(cachedFallback)
+                    } else {
+                        completion([])
+                    }
                 }
             }
         }
@@ -397,7 +610,8 @@ final class WorkspaceViewModel: ObservableObject {
                 customTitle: serverTitle,
                 content: cachedContent,
                 isDirty: false,
-                isLoading: false
+                isLoading: false,
+                isServerFile: true
             )
             openFiles.append(openFile)
             activeFileID = openFile.id
@@ -409,7 +623,8 @@ final class WorkspaceViewModel: ObservableObject {
             customTitle: serverTitle,
             content: "Loading...",
             isDirty: false,
-            isLoading: true
+            isLoading: true,
+            isServerFile: true
         )
         openFiles.append(loadingFile)
         activeFileID = loadingFile.id
@@ -422,15 +637,33 @@ final class WorkspaceViewModel: ObservableObject {
                     if let json = response as? [String: Any],
                        let status = json["status"] as? String, status == "File content retrieved",
                        let content = json["content"] as? String,
-                       let type = json["type"] as? String, type == "text" {
-
-                        self.serverFileContentCache[file.path] = content
-                        self.saveCacheToUserDefaults()
+                       let type = json["type"] as? String {
                         
-                        if let idx = self.openFiles.firstIndex(where: { $0.id == tempURL.path }) {
-                            self.openFiles[idx].content = content
-                            self.openFiles[idx].isLoading = false
-                            try? content.write(to: tempURL, atomically: true, encoding: .utf8)
+                        if type == "text" {
+                            self.serverFileContentCache[file.path] = content
+                            self.saveCacheToUserDefaults()
+                            
+                            if let idx = self.openFiles.firstIndex(where: { $0.id == tempURL.path }) {
+                                self.openFiles[idx].content = content
+                                self.openFiles[idx].isLoading = false
+                                try? content.write(to: tempURL, atomically: true, encoding: .utf8)
+                            }
+                        } else if type == "binary" {
+                            if let binaryData = Data(base64Encoded: content) {
+                                try? binaryData.write(to: tempURL)
+                                
+                                if let idx = self.openFiles.firstIndex(where: { $0.id == tempURL.path }) {
+                                    self.openFiles[idx].binaryData = binaryData
+                                    self.openFiles[idx].isLoading = false
+                                }
+                            } else {
+                                if let idx = self.openFiles.firstIndex(where: { $0.id == tempURL.path }) {
+                                    self.openFiles.remove(at: idx)
+                                    if self.activeFileID == tempURL.path {
+                                        self.activeFileID = self.openFiles.last?.id
+                                    }
+                                }
+                            }
                         }
                     } else {
                         if let idx = self.openFiles.firstIndex(where: { $0.id == tempURL.path }) {
@@ -442,10 +675,19 @@ final class WorkspaceViewModel: ObservableObject {
                     }
                 case .failure(let error):
                     print("Failed to open server file: \(error)")
-                    if let idx = self.openFiles.firstIndex(where: { $0.id == tempURL.path }) {
-                        self.openFiles.remove(at: idx)
-                        if self.activeFileID == tempURL.path {
-                            self.activeFileID = self.openFiles.last?.id
+                    
+                    if let cachedContent = self.serverFileContentCache[file.path] {
+                        if let idx = self.openFiles.firstIndex(where: { $0.id == tempURL.path }) {
+                            self.openFiles[idx].content = cachedContent
+                            self.openFiles[idx].isLoading = false
+                            try? cachedContent.write(to: tempURL, atomically: true, encoding: .utf8)
+                        }
+                    } else {
+                        if let idx = self.openFiles.firstIndex(where: { $0.id == tempURL.path }) {
+                            self.openFiles.remove(at: idx)
+                            if self.activeFileID == tempURL.path {
+                                self.activeFileID = self.openFiles.last?.id
+                            }
                         }
                     }
                 }
@@ -511,6 +753,187 @@ final class WorkspaceViewModel: ObservableObject {
                 }
             }
         }
+    }
+    
+    private func createServerFile(name: String, in parentNode: FileNode?) {
+        guard let serverPath = serverFolderPath else { return }
+        
+        let path = serverPath.hasSuffix("/") ? serverPath : serverPath + "/"
+        
+        let requestBody: [String: Any] = [
+            "file_name": name,
+            "path": path,
+            "file_content": ""
+        ]
+        
+        ServerManager.shared.executeServerCommand(command: "/new_file", method: "POST", body: requestBody, waitTime: 3) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(_):
+                    self.serverFolderCache.removeValue(forKey: serverPath)
+                    self.refreshServerFolder()
+                case .failure(let error):
+                    print("Failed to create server file: \(error)")
+                }
+            }
+        }
+    }
+    
+    private func createServerFolder(name: String, in parentNode: FileNode?) {
+        guard let serverPath = serverFolderPath else { return }
+        
+        let path = serverPath.hasSuffix("/") ? serverPath : serverPath + "/"
+        
+        let requestBody: [String: Any] = [
+            "folder_name": name,
+            "path": path
+        ]
+        
+        ServerManager.shared.executeServerCommand(command: "/create_folder", method: "POST", body: requestBody, waitTime: 3) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(_):
+                    self.serverFolderCache.removeValue(forKey: serverPath)
+                    self.refreshServerFolder()
+                case .failure(let error):
+                    print("Failed to create server folder: \(error)")
+                }
+            }
+        }
+    }
+    
+    private func saveServerFile(_ file: OpenFile) {
+        guard let serverTitle = file.customTitle, serverTitle.hasPrefix("server") else { return }
+        
+        let filePath = serverTitle.replacingOccurrences(of: "server", with: "")
+        
+        let requestBody: [String: Any] = [
+            "path": filePath,
+            "file_content": file.content
+        ]
+        
+        ServerManager.shared.executeServerCommand(command: "/edit_file", method: "POST", body: requestBody, waitTime: 3) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(_):
+                    if let idx = self.openFiles.firstIndex(where: { $0.id == file.id }) {
+                        self.openFiles[idx].isDirty = false
+                    }
+                    self.serverFileContentCache[filePath] = file.content
+                    self.saveCacheToUserDefaults()
+                    print("Server file saved successfully")
+                case .failure(let error):
+                    print("Failed to save server file: \(error)")
+                }
+            }
+        }
+    }
+    
+    private func refreshServerFolder() {
+        guard let serverPath = serverFolderPath else { return }
+        
+        let requestBody: [String: Any] = ["path": serverPath]
+        
+        ServerManager.shared.executeServerCommand(command: "/finder", method: "GET", body: requestBody, waitTime: 3) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let response):
+                    var fileNames: [String] = []
+                    if let responseDict = response as? [String: Any],
+                       let itemsArray = responseDict["items"] as? [String] {
+                        fileNames = itemsArray
+                    } else if let directArray = response as? [String] {
+                        fileNames = directArray
+                    }
+                    
+                    let children = fileNames.map { fileName in
+                        ServerFileNode(
+                            name: fileName,
+                            path: serverPath + "/" + fileName,
+                            isFolder: !fileName.contains("."),
+                            children: nil
+                        )
+                    }
+                    
+                    self.serverFolderCache[serverPath] = children
+                    
+                    let serverRoot = ServerFileNode(
+                        name: serverPath.split(separator: "/").last.map(String.init) ?? "Root",
+                        path: serverPath,
+                        isFolder: true,
+                        children: children
+                    )
+                    
+                    self.serverRootNode = serverRoot
+                    self.saveCacheToUserDefaults()
+                    
+                case .failure(let error):
+                    print("Failed to refresh server folder: \(error)")
+                }
+            }
+        }
+    }
+    
+    func createNote(title: String) {
+        let note = Note(title: title)
+        notes.append(note)
+        saveNotes()
+    }
+    
+    func updateNote(_ note: Note, drawingData: Data) {
+        if let idx = notes.firstIndex(where: { $0.id == note.id }) {
+            notes[idx].drawingData = drawingData
+            notes[idx].modifiedAt = Date()
+            saveNotes()
+        }
+    }
+    
+    func deleteNote(_ note: Note) {
+        notes.removeAll { $0.id == note.id }
+        saveNotes()
+    }
+    
+    private func saveNotes() {
+        if let encoded = try? JSONEncoder().encode(notes) {
+            UserDefaults.standard.set(encoded, forKey: "saved_notes")
+        }
+    }
+    
+    private func loadNotes() {
+        if let data = UserDefaults.standard.data(forKey: "saved_notes"),
+           let decoded = try? JSONDecoder().decode([Note].self, from: data) {
+            notes = decoded
+        }
+    }
+    
+    func shareServerFile(_ file: OpenFile) {
+        #if os(iOS)
+        guard file.isServerFile else { return }
+        
+        let activityVC = UIActivityViewController(activityItems: [file.url], applicationActivities: nil)
+        
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first,
+           let rootVC = window.rootViewController {
+            
+            if let popover = activityVC.popoverPresentationController {
+                popover.sourceView = rootVC.view
+                popover.sourceRect = CGRect(x: rootVC.view.bounds.midX, y: rootVC.view.bounds.midY, width: 0, height: 0)
+                popover.permittedArrowDirections = []
+            }
+            
+            rootVC.present(activityVC, animated: true)
+        }
+        #elseif os(macOS)
+        guard file.isServerFile else { return }
+        
+        let picker = NSSharingServicePicker(items: [file.url])
+        
+        if let window = NSApp.keyWindow {
+            let rect = NSRect(x: window.frame.midX, y: window.frame.midY, width: 0, height: 0)
+            picker.show(relativeTo: rect, of: window.contentView!, preferredEdge: .minY)
+        }
+        #endif
     }
 }
 

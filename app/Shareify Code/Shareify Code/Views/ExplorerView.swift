@@ -33,9 +33,9 @@ struct ExplorerView: View {
                 
                 HStack(spacing: Theme.spacingXS) {
                     ToolbarIconButton(icon: "doc.badge.plus") { showNewFileSheet = true }
-                        .disabled(vm.rootNode == nil)
+                        .disabled(vm.rootNode == nil && !vm.isServerFolder)
                     ToolbarIconButton(icon: "folder.badge.plus") { showNewFolderSheet = true }
-                        .disabled(vm.rootNode == nil)
+                        .disabled(vm.rootNode == nil && !vm.isServerFolder)
                     ToolbarIconButton(icon: "arrow.clockwise") {
                         if let root = vm.rootNode { vm.refreshNode(root) }
                     }
@@ -421,6 +421,20 @@ private struct FileTreeNodeView: View {
                 )
             
             Spacer(minLength: 0)
+            
+            if hover && !node.isDirectory {
+                Button(action: { vm.deleteFile(node) }) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(Color.red)
+                        .frame(width: 20, height: 20)
+                        .background(
+                            Circle()
+                                .fill(Color.red.opacity(0.1))
+                        )
+                }
+                .buttonStyle(.plain)
+            }
         }
         .contentShape(Rectangle())
         .onTapGesture(count: 1) {
@@ -498,6 +512,7 @@ struct ServerFileTreeNodeView: View {
     let level: Int
     @State private var children: [ServerFileNode] = []
     @State private var isLoading = false
+    @State private var hover = false
     
     var isExpanded: Bool {
         vm.expandedServerPaths.contains(node.path)
@@ -513,52 +528,67 @@ struct ServerFileTreeNodeView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Button(action: {
+            HStack(spacing: Theme.spacingS) {
+                if node.isFolder {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Color.appTextTertiary)
+                        .frame(width: 12)
+                } else {
+                    Spacer()
+                        .frame(width: 12)
+                }
+                
+                Image(systemName: iconForNode())
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(colorForNode())
+                    .frame(width: 20)
+                
+                Text(node.name)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.appTextPrimary)
+                    .lineLimit(1)
+                
+                if isLoading {
+                    ProgressView()
+                        .scaleEffect(0.6)
+                        .frame(width: 12, height: 12)
+                }
+                
+                Spacer()
+                
+                if hover {
+                    Button(action: { vm.deleteServerFileNode(node) }) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Color.red)
+                            .frame(width: 20, height: 20)
+                            .background(
+                                Circle()
+                                    .fill(Color.red.opacity(0.1))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.leading, CGFloat(level) * 16 + Theme.spacingM)
+            .padding(.trailing, Theme.spacingM)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: Theme.radiusS, style: .continuous)
+                    .fill(isActiveFile ? Color.appAccent.opacity(0.15) : (hover ? Color.appSurfaceHover : Color.clear))
+            )
+            .onTapGesture {
                 if node.isFolder {
                     toggleFolder()
                 } else {
                     vm.openServerFile(node)
                 }
-            }) {
-                HStack(spacing: Theme.spacingS) {
-                    if node.isFolder {
-                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Color.appTextTertiary)
-                            .frame(width: 12)
-                    } else {
-                        Spacer()
-                            .frame(width: 12)
-                    }
-                    
-                    Image(systemName: iconForNode())
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(colorForNode())
-                        .frame(width: 20)
-                    
-                    Text(node.name)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.appTextPrimary)
-                        .lineLimit(1)
-                    
-                    if isLoading {
-                        ProgressView()
-                            .scaleEffect(0.6)
-                            .frame(width: 12, height: 12)
-                    }
-                    
-                    Spacer()
-                }
-                .padding(.leading, CGFloat(level) * 16 + Theme.spacingM)
-                .padding(.trailing, Theme.spacingM)
-                .padding(.vertical, 6)
-                .contentShape(Rectangle())
-                .background(
-                    RoundedRectangle(cornerRadius: Theme.radiusS, style: .continuous)
-                        .fill(isActiveFile ? Color.appAccent.opacity(0.15) : Color.clear)
-                )
             }
-            .buttonStyle(.plain)
+            .onHover { h in
+                withAnimation(.easeInOut(duration: Theme.animationFast)) { hover = h }
+            }
             
             if node.isFolder && isExpanded {
                 ForEach(children) { child in
