@@ -258,12 +258,14 @@ struct ServerBrowserView: View {
     }
     
     private func loadServerFolder(path: String) {
-        isLoading = true
+        isPresented = false
+        
+        vm.setServerFolderLoading(path: path)
+        
         let requestBody: [String: Any] = ["path": path]
         
         ServerManager.shared.executeServerCommand(command: "/finder", method: "GET", body: requestBody, waitTime: 3) { result in
             DispatchQueue.main.async {
-                isLoading = false
                 switch result {
                 case .success(let response):
                     var fileNames: [String] = []
@@ -283,10 +285,10 @@ struct ServerBrowserView: View {
                     }
                     
                     vm.loadServerFolder(path: path, files: serverFiles)
-                    isPresented = false
                     
                 case .failure(let error):
                     print("Failed to load server folder: \(error)")
+                    vm.clearServerFolderLoading()
                 }
             }
         }

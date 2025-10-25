@@ -22,6 +22,7 @@ final class WorkspaceViewModel: ObservableObject {
     @Published var serverFolderPath: String?
     @Published var serverRootNode: ServerFileNode?
     @Published var expandedServerPaths: Set<String> = []
+    @Published var isLoadingServerFolder = false
     
     private var serverFolderCache: [String: [ServerFileNode]] = [:]
     private var serverFileContentCache: [String: String] = [:]
@@ -544,10 +545,32 @@ final class WorkspaceViewModel: ObservableObject {
             self.serverRootNode = serverRoot
             self.serverFolderCache[path] = files
             self.expandedServerPaths = [path]
+            self.isLoadingServerFolder = false
 
             UserDefaults.standard.set(path, forKey: "lastServerFolderPath")
             self.saveCacheToUserDefaults()
         }
+    }
+    
+    func setServerFolderLoading(path: String) {
+        rootURL = nil
+        rootNode = nil
+        expanded = []
+        isServerFolder = true
+        serverFolderPath = path
+        serverRootNode = nil
+        expandedServerPaths = []
+        isLoadingServerFolder = true
+        
+        saveOpenFilesCache()
+        openFiles = []
+        activeFileID = nil
+    }
+    
+    func clearServerFolderLoading() {
+        isLoadingServerFolder = false
+        isServerFolder = false
+        serverFolderPath = nil
     }
     
     func loadServerChildren(for node: ServerFileNode, completion: @escaping ([ServerFileNode]) -> Void) {

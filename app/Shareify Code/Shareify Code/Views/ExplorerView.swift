@@ -94,6 +94,25 @@ struct ExplorerView: View {
                         .padding(.vertical, Theme.spacingS)
                         .padding(.horizontal, Theme.spacingXS)
                 }
+            } else if vm.isLoadingServerFolder {
+                VStack(spacing: Theme.spacingL) {
+                    Spacer()
+                    
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .padding(.bottom, Theme.spacingM)
+                    
+                    Text("Loading server folder...")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(Color.appTextPrimary)
+                    
+                    Text("Please wait")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.appTextSecondary)
+                    
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let root = vm.rootNode {
                 ScrollViewReader { _ in
                     ScrollView {
