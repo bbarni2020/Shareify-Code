@@ -64,6 +64,7 @@ struct EditorView: View {
                         )
                         .padding(.horizontal, Theme.spacingL)
                         .padding(.bottom, Theme.spacingL)
+                        .transition(.opacity.combined(with: .scale))
                     } else if active.url.detectedLanguage != .unknown {
                         #if os(iOS)
                         CodeEditorView(
@@ -149,6 +150,8 @@ private struct TabBarView: View {
                                     Circle()
                                         .fill(Color.appAccent)
                                         .frame(width: 6, height: 6)
+                                        .scaleEffect(file.isDirty ? 1.0 : 0.0)
+                                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: file.isDirty)
                                 }
                             }
                             .padding(.horizontal, Theme.spacingM)
@@ -169,7 +172,11 @@ private struct TabBarView: View {
                                     )
                             )
                             .contentShape(Rectangle())
-                            .onTapGesture { vm.activeFileID = file.id }
+                            .onTapGesture { 
+                                withAnimation(.easeInOut(duration: Theme.animationFast)) {
+                                    vm.activeFileID = file.id 
+                                }
+                            }
                             .onHover { hovering in
                                 withAnimation(.easeInOut(duration: Theme.animationFast)) {
                                     hoverTab = hovering ? file.id : nil
@@ -177,7 +184,9 @@ private struct TabBarView: View {
                             }
                             
                             Button {
-                                vm.closeFile(file.id)
+                                withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                                    vm.closeFile(file.id)
+                                }
                             } label: {
                                 Image(systemName: "xmark")
                                     .font(.system(size: 10, weight: .semibold))
@@ -196,7 +205,11 @@ private struct TabBarView: View {
                 .frame(height: 24)
             
             if let activeFile = vm.openFiles.first(where: { $0.id == vm.activeFileID }), activeFile.isServerFile {
-                Button(action: { vm.shareServerFile(activeFile) }) {
+                Button(action: { 
+                    withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                        vm.shareServerFile(activeFile) 
+                    }
+                }) {
                     HStack(spacing: Theme.spacingXS) {
                         Image(systemName: "square.and.arrow.up")
                             .font(.system(size: 12, weight: .medium))
@@ -208,12 +221,17 @@ private struct TabBarView: View {
                     .padding(.vertical, Theme.spacingS)
                 }
                 .buttonStyle(.plain)
+                .transition(.scale.combined(with: .opacity))
                 
                 Divider()
                     .frame(height: 24)
             }
             
-            Button(action: { vm.showNotesView = true }) {
+            Button(action: { 
+                withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                    vm.showNotesView = true 
+                }
+            }) {
                 HStack(spacing: Theme.spacingXS) {
                     Image(systemName: "pencil.and.scribble")
                         .font(.system(size: 12, weight: .medium))
@@ -229,7 +247,11 @@ private struct TabBarView: View {
             Divider()
                 .frame(height: 24)
             
-            Button(action: vm.saveActive) {
+            Button(action: {
+                withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                    vm.saveActive()
+                }
+            }) {
                 HStack(spacing: Theme.spacingXS) {
                     Image(systemName: "arrow.down.doc.fill")
                         .font(.system(size: 12, weight: .medium))
@@ -302,7 +324,11 @@ private struct StatusBarView: View {
             
             Spacer()
             
-            Button(action: vm.saveActive) {
+            Button(action: {
+                withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                    vm.saveActive()
+                }
+            }) {
                 HStack(spacing: Theme.spacingXS) {
                     Image(systemName: "arrow.down.doc")
                         .font(.system(size: 10))
@@ -330,6 +356,7 @@ private struct StatusBarView: View {
 
 private struct NoFileOpenView: View {
     @State private var pulse = false
+    @State private var rotate = false
     
     var body: some View {
         ZStack {
@@ -354,6 +381,11 @@ private struct NoFileOpenView: View {
                     Image(systemName: "doc.text")
                         .font(.system(size: 36, weight: .medium))
                         .foregroundStyle(Color.appTextTertiary)
+                        .rotationEffect(.degrees(rotate ? 5 : -5))
+                        .animation(
+                            .easeInOut(duration: 2.0).repeatForever(autoreverses: true),
+                            value: rotate
+                        )
                 }
                 
                 VStack(spacing: Theme.spacingXS) {
@@ -368,7 +400,10 @@ private struct NoFileOpenView: View {
                 }
             }
         }
-        .task { pulse = true }
+        .task { 
+            pulse = true 
+            rotate = true
+        }
     }
 }
 
@@ -403,6 +438,7 @@ private struct MediaContentView: View {
 private struct ImageViewer: View {
     let file: WorkspaceViewModel.OpenFile
     @State private var scale: CGFloat = 1.0
+    @State private var isZooming = false
     
     var body: some View {
         GeometryReader { geometry in
@@ -415,12 +451,14 @@ private struct ImageViewer: View {
                             .scaledToFit()
                             .scaleEffect(scale)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: scale)
                         #else
                         Image(uiImage: nsImage)
                             .resizable()
                             .scaledToFit()
                             .scaleEffect(scale)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: scale)
                         #endif
                     } else {
                         VStack(spacing: Theme.spacingM) {
@@ -438,7 +476,11 @@ private struct ImageViewer: View {
             }
             .overlay(alignment: .bottomTrailing) {
                 HStack(spacing: Theme.spacingS) {
-                    Button(action: { scale = max(0.1, scale - 0.25) }) {
+                    Button(action: { 
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            scale = max(0.1, scale - 0.25) 
+                        }
+                    }) {
                         Image(systemName: "minus.magnifyingglass")
                             .font(.system(size: 14))
                     }
@@ -449,13 +491,21 @@ private struct ImageViewer: View {
                         .foregroundStyle(Color.appTextSecondary)
                         .frame(minWidth: 45)
                     
-                    Button(action: { scale = min(5.0, scale + 0.25) }) {
+                    Button(action: { 
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            scale = min(5.0, scale + 0.25) 
+                        }
+                    }) {
                         Image(systemName: "plus.magnifyingglass")
                             .font(.system(size: 14))
                     }
                     .buttonStyle(.plain)
                     
-                    Button(action: { scale = 1.0 }) {
+                    Button(action: { 
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            scale = 1.0 
+                        }
+                    }) {
                         Text("Reset")
                             .font(.system(size: 12, weight: .medium))
                     }
@@ -523,6 +573,7 @@ private struct AudioViewer: View {
     let file: WorkspaceViewModel.OpenFile
     @State private var player: AVPlayer?
     @State private var isPlaying = false
+    @State private var pulseAnimation = false
     
     var body: some View {
         VStack(spacing: Theme.spacingXL) {
@@ -532,11 +583,19 @@ private struct AudioViewer: View {
                 Circle()
                     .fill(Color.appAccent.opacity(0.1))
                     .frame(width: 120, height: 120)
+                    .scaleEffect(pulseAnimation && isPlaying ? 1.2 : 1.0)
+                    .opacity(pulseAnimation && isPlaying ? 0.0 : 1.0)
+                    .animation(
+                        isPlaying ? .easeOut(duration: 1.5).repeatForever(autoreverses: false) : .default,
+                        value: pulseAnimation
+                    )
                 
                 Image(systemName: isPlaying ? "waveform" : "music.note")
                     .font(.system(size: 48, weight: .medium))
                     .foregroundStyle(Color.appAccent)
                     .symbolEffect(.pulse, options: .repeating, isActive: isPlaying)
+                    .scaleEffect(isPlaying ? 1.1 : 1.0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPlaying)
             }
             
             VStack(spacing: Theme.spacingS) {
@@ -551,16 +610,20 @@ private struct AudioViewer: View {
             
             HStack(spacing: Theme.spacingL) {
                 Button(action: {
-                    if isPlaying {
-                        player?.pause()
-                    } else {
-                        player?.play()
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                        if isPlaying {
+                            player?.pause()
+                        } else {
+                            player?.play()
+                        }
+                        isPlaying.toggle()
+                        pulseAnimation.toggle()
                     }
-                    isPlaying.toggle()
                 }) {
                     Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
                         .font(.system(size: 64))
                         .foregroundStyle(Color.appAccent)
+                        .scaleEffect(isPlaying ? 1.0 : 0.95)
                 }
                 .buttonStyle(.plain)
             }

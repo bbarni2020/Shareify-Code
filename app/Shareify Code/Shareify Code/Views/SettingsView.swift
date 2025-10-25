@@ -90,11 +90,13 @@ struct SettingsView: View {
                             Spacer()
                             
                             Button(action: {
-                                if isLoggedIn {
-                                    isLoggedIn = false
-                                    username = "Guest"
-                                } else {
-                                    showLoginSheet = true
+                                withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                                    if isLoggedIn {
+                                        isLoggedIn = false
+                                        username = "Guest"
+                                    } else {
+                                        showLoginSheet = true
+                                    }
                                 }
                             }) {
                                 Text(isLoggedIn ? "Sign Out" : "Sign In")
@@ -158,6 +160,8 @@ struct SettingsView: View {
                             Toggle("", isOn: $aiEnabled)
                                 .labelsHidden()
                                 .tint(Color.appAccent)
+                                .scaleEffect(1.0)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: aiEnabled)
                         }
                         .padding(Theme.spacingL)
                         .background(
@@ -202,7 +206,9 @@ struct SettingsView: View {
                                 
                                 if isServerConnected {
                                     Button(action: {
-                                        disconnectServer()
+                                        withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                                            disconnectServer()
+                                        }
                                     }) {
                                         Text("Disconnect")
                                             .font(.system(size: 13, weight: .medium))
@@ -219,9 +225,12 @@ struct SettingsView: View {
                                             )
                                     }
                                     .buttonStyle(.plain)
+                                    .transition(.scale.combined(with: .opacity))
                                 } else if isLoggedIn {
                                     Button(action: {
-                                        showServerLogin = true
+                                        withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                                            showServerLogin = true
+                                        }
                                     }) {
                                         Text("Connect")
                                             .font(.system(size: 13, weight: .medium))
@@ -234,6 +243,7 @@ struct SettingsView: View {
                                             )
                                     }
                                     .buttonStyle(.plain)
+                                    .transition(.scale.combined(with: .opacity))
                                 }
                             }
                             .padding(Theme.spacingL)
@@ -307,8 +317,10 @@ struct SettingsView: View {
             LoginSheet(
                 isPresented: $showLoginSheet,
                 onLogin: { user in
-                    username = user
-                    isLoggedIn = true
+                    withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                        username = user
+                        isLoggedIn = true
+                    }
                 }
             )
         }
@@ -316,14 +328,18 @@ struct SettingsView: View {
             ServerLoginSheet(
                 isPresented: $showServerLogin,
                 onConnect: { serverUser in
-                    serverUsername = serverUser
-                    isServerConnected = true
+                    withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                        serverUsername = serverUser
+                        isServerConnected = true
+                    }
                 }
             )
         }
         .onAppear {
             loadUserState()
         }
+        .animation(.spring(response: Theme.animationNormal, dampingFraction: 0.8), value: isServerConnected)
+        .animation(.spring(response: Theme.animationNormal, dampingFraction: 0.8), value: isLoggedIn)
     }
     
     private func loadUserState() {
@@ -340,13 +356,15 @@ struct SettingsView: View {
     }
     
     private func disconnectServer() {
-        UserDefaults.standard.removeObject(forKey: "server_username")
-        UserDefaults.standard.removeObject(forKey: "server_password")
-        UserDefaults.standard.removeObject(forKey: "shareify_jwt")
-        UserDefaults.standard.synchronize()
-        
-        serverUsername = ""
-        isServerConnected = false
+        withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+            UserDefaults.standard.removeObject(forKey: "server_username")
+            UserDefaults.standard.removeObject(forKey: "server_password")
+            UserDefaults.standard.removeObject(forKey: "shareify_jwt")
+            UserDefaults.standard.synchronize()
+            
+            serverUsername = ""
+            isServerConnected = false
+        }
     }
 }
 

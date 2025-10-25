@@ -8,7 +8,7 @@ struct ContentView: View {
     @State private var showSharAI = false
     @State private var hoverSharAI = false
     @State private var showSettings = false
-    @State private var aiEnabled = true
+    @State private var aiEnabled = false
     @State private var isServerConnected = false
     @State private var isSignedIn = false
     @State private var showFolderSourcePicker = false
@@ -182,6 +182,7 @@ struct ContentView: View {
         .animation(.spring(response: Theme.animationNormal, dampingFraction: 0.8), value: aiEnabled)
         .onAppear {
             checkServerConnection()
+            checkAIAvailability()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerLoginStatusChanged"))) { _ in
             checkServerConnection()
@@ -308,6 +309,33 @@ struct ContentView: View {
         }
     }
     
+    private func checkAIAvailability() {
+        guard let url = URL(string: "https://raw.githubusercontent.com/bbarni2020/Shareify-Code/refs/heads/main/info/ai.json") else {
+            aiEnabled = false
+            return
+        }
+        
+        URLSession.shared.dataTask(with: url) { data, response, error in
+            guard let data = data, error == nil else {
+                DispatchQueue.main.async {
+                    aiEnabled = false
+                }
+                return
+            }
+            
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let available = json["available"] as? Bool {
+                DispatchQueue.main.async {
+                    aiEnabled = available
+                }
+            } else {
+                DispatchQueue.main.async {
+                    aiEnabled = false
+                }
+            }
+        }.resume()
+    }
+    
     private func openServerBrowser() {
         showFolderSourcePicker = false
         withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
@@ -320,6 +348,8 @@ struct FolderSourcePicker: View {
     @Binding var isPresented: Bool
     let onLocalSelected: () -> Void
     let onServerSelected: () -> Void
+    @State private var hoverLocal = false
+    @State private var hoverServer = false
     
     var body: some View {
         VStack(spacing: Theme.spacingXL) {
@@ -345,8 +375,10 @@ struct FolderSourcePicker: View {
             
             VStack(spacing: Theme.spacingM) {
                 Button(action: {
-                    isPresented = false
-                    onLocalSelected()
+                    withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                        isPresented = false
+                        onLocalSelected()
+                    }
                 }) {
                     HStack(spacing: Theme.spacingM) {
                         ZStack {
@@ -385,12 +417,20 @@ struct FolderSourcePicker: View {
                         RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
                             .stroke(Color.appBorder, lineWidth: 1)
                     )
+                    .scaleEffect(hoverLocal ? 1.02 : 1.0)
                 }
                 .buttonStyle(.plain)
+                .onHover { hovering in
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        hoverLocal = hovering
+                    }
+                }
                 
                 Button(action: {
-                    isPresented = false
-                    onServerSelected()
+                    withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                        isPresented = false
+                        onServerSelected()
+                    }
                 }) {
                     HStack(spacing: Theme.spacingM) {
                         ZStack {
@@ -429,8 +469,14 @@ struct FolderSourcePicker: View {
                         RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
                             .stroke(Color.appBorder, lineWidth: 1)
                     )
+                    .scaleEffect(hoverServer ? 1.02 : 1.0)
                 }
                 .buttonStyle(.plain)
+                .onHover { hovering in
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        hoverServer = hovering
+                    }
+                }
             }
             
             Button(action: {

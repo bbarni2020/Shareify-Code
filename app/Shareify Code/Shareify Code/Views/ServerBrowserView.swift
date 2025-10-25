@@ -18,11 +18,13 @@ struct ServerBrowserView: View {
         VStack(spacing: 0) {
             HStack {
                 Button(action: {
-                    if currentPath.isEmpty {
-                        isPresented = false
-                    } else {
-                        _ = currentPath.popLast()
-                        fetchItems()
+                    withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                        if currentPath.isEmpty {
+                            isPresented = false
+                        } else {
+                            _ = currentPath.popLast()
+                            fetchItems()
+                        }
                     }
                 }) {
                     Image(systemName: "chevron.left")
@@ -45,7 +47,9 @@ struct ServerBrowserView: View {
                 Spacer()
                 
                 Button(action: {
-                    isPresented = false
+                    withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                        isPresented = false
+                    }
                 }) {
                     Image(systemName: "xmark")
                         .font(.system(size: 12, weight: .semibold))
@@ -98,24 +102,33 @@ struct ServerBrowserView: View {
                         .padding(.top, Theme.spacingM)
                     Spacer()
                 }
+                .transition(.opacity.combined(with: .scale))
             } else {
                 ScrollView {
                     LazyVStack(spacing: 4) {
                         ForEach(items.filter { $0.isFolder }) { item in
                             folderItemView(item: item)
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .top).combined(with: .opacity),
+                                    removal: .scale.combined(with: .opacity)
+                                ))
                         }
                     }
                     .padding(Theme.spacingM)
                 }
+                .transition(.opacity)
             }
             
             if selectedFolder != nil {
                 Divider()
                     .background(Color.appBorder)
+                    .transition(.opacity)
                 
                 HStack(spacing: Theme.spacingM) {
                     Button(action: {
-                        selectedFolder = nil
+                        withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                            selectedFolder = nil
+                        }
                     }) {
                         Text("Cancel")
                             .font(.system(size: 14, weight: .medium))
@@ -134,7 +147,9 @@ struct ServerBrowserView: View {
                     .buttonStyle(.plain)
                     
                     Button(action: {
-                        openSelectedFolder()
+                        withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                            openSelectedFolder()
+                        }
                     }) {
                         Text("Open Folder")
                             .font(.system(size: 14, weight: .semibold))
@@ -150,6 +165,7 @@ struct ServerBrowserView: View {
                 }
                 .padding(Theme.spacingL)
                 .background(Color.appSurface)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .frame(width: 520, height: 600)
@@ -163,6 +179,8 @@ struct ServerBrowserView: View {
         .onAppear {
             fetchItems()
         }
+        .animation(.spring(response: Theme.animationNormal, dampingFraction: 0.8), value: selectedFolder)
+        .animation(.spring(response: Theme.animationNormal, dampingFraction: 0.8), value: isLoading)
     }
     
     private func folderItemView(item: ServerFileItem) -> some View {
@@ -181,12 +199,15 @@ struct ServerBrowserView: View {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 18))
                     .foregroundStyle(Color.appAccent)
+                    .transition(.scale.combined(with: .opacity))
             }
             
             Button(action: {
-                currentPath.append(item.name)
-                selectedFolder = nil
-                fetchItems()
+                withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                    currentPath.append(item.name)
+                    selectedFolder = nil
+                    fetchItems()
+                }
             }) {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
@@ -207,13 +228,17 @@ struct ServerBrowserView: View {
         )
         .contentShape(Rectangle())
         .onTapGesture(count: 2) {
-            openFolderDirectly(item.name)
+            withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                openFolderDirectly(item.name)
+            }
         }
         .onTapGesture {
-            if selectedFolder == item.name {
-                selectedFolder = nil
-            } else {
-                selectedFolder = item.name
+            withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                if selectedFolder == item.name {
+                    selectedFolder = nil
+                } else {
+                    selectedFolder = item.name
+                }
             }
         }
     }

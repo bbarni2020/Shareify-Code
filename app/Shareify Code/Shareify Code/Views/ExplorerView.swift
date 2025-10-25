@@ -113,6 +113,7 @@ struct ExplorerView: View {
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .transition(.opacity.combined(with: .scale))
             } else if let root = vm.rootNode {
                 ScrollViewReader { _ in
                     ScrollView {
@@ -147,10 +148,12 @@ struct ExplorerView: View {
                     }
                     
                     Button(action: { 
-                        if isServerOnline {
-                            showFolderSourcePicker = true
-                        } else {
-                            vm.openFolder()
+                        withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                            if isServerOnline {
+                                showFolderSourcePicker = true
+                            } else {
+                                vm.openFolder()
+                            }
                         }
                     }) {
                         HStack(spacing: Theme.spacingS) {
@@ -186,6 +189,7 @@ struct ExplorerView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .transition(.opacity.combined(with: .scale))
             }
         }
         .frame(minWidth: 280)
@@ -198,9 +202,11 @@ struct ExplorerView: View {
                 placeholder: "filename.swift",
                 itemName: $newFileName,
                 onCreate: {
-                    vm.createFile(name: newFileName, in: vm.selectedNode?.isDirectory == true ? vm.selectedNode : nil)
-                    showNewFileSheet = false
-                    newFileName = ""
+                    withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                        vm.createFile(name: newFileName, in: vm.selectedNode?.isDirectory == true ? vm.selectedNode : nil)
+                        showNewFileSheet = false
+                        newFileName = ""
+                    }
                 },
                 onCancel: {
                     showNewFileSheet = false
@@ -217,9 +223,11 @@ struct ExplorerView: View {
                 placeholder: "folder-name",
                 itemName: $newFolderName,
                 onCreate: {
-                    vm.createFolder(name: newFolderName, in: vm.selectedNode?.isDirectory == true ? vm.selectedNode : nil)
-                    showNewFolderSheet = false
-                    newFolderName = ""
+                    withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                        vm.createFolder(name: newFolderName, in: vm.selectedNode?.isDirectory == true ? vm.selectedNode : nil)
+                        showNewFolderSheet = false
+                        newFolderName = ""
+                    }
                 },
                 onCancel: {
                     showNewFolderSheet = false
@@ -420,6 +428,8 @@ private struct FileTreeNodeView: View {
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(Color.appTextTertiary)
                     .frame(width: 12)
+                    .rotationEffect(.degrees(vm.expanded.contains(node.id) ? 0 : -90))
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: vm.expanded.contains(node.id))
             } else {
                 Spacer().frame(width: 12)
             }
@@ -442,7 +452,11 @@ private struct FileTreeNodeView: View {
             Spacer(minLength: 0)
             
             if hover && !node.isDirectory {
-                Button(action: { vm.deleteFile(node) }) {
+                Button(action: { 
+                    withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                        vm.deleteFile(node) 
+                    }
+                }) {
                     Image(systemName: "trash")
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(Color.red)
@@ -453,6 +467,7 @@ private struct FileTreeNodeView: View {
                         )
                 }
                 .buttonStyle(.plain)
+                .transition(.scale.combined(with: .opacity))
             }
         }
         .contentShape(Rectangle())
@@ -577,7 +592,11 @@ struct ServerFileTreeNodeView: View {
                 Spacer()
                 
                 if hover {
-                    Button(action: { vm.deleteServerFileNode(node) }) {
+                    Button(action: { 
+                        withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                            vm.deleteServerFileNode(node) 
+                        }
+                    }) {
                         Image(systemName: "trash")
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(Color.red)
@@ -588,6 +607,7 @@ struct ServerFileTreeNodeView: View {
                             )
                     }
                     .buttonStyle(.plain)
+                    .transition(.scale.combined(with: .opacity))
                 }
             }
             .padding(.leading, CGFloat(level) * 16 + Theme.spacingM)
@@ -599,10 +619,12 @@ struct ServerFileTreeNodeView: View {
                     .fill(isActiveFile ? Color.appAccent.opacity(0.15) : (hover ? Color.appSurfaceHover : Color.clear))
             )
             .onTapGesture {
-                if node.isFolder {
-                    toggleFolder()
-                } else {
-                    vm.openServerFile(node)
+                withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+                    if node.isFolder {
+                        toggleFolder()
+                    } else {
+                        vm.openServerFile(node)
+                    }
                 }
             }
             .onHover { h in
@@ -612,6 +634,10 @@ struct ServerFileTreeNodeView: View {
             if node.isFolder && isExpanded {
                 ForEach(children) { child in
                     ServerFileTreeNodeView(node: child, vm: vm, level: level + 1)
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .top).combined(with: .opacity),
+                            removal: .opacity
+                        ))
                 }
             }
         }
@@ -623,11 +649,13 @@ struct ServerFileTreeNodeView: View {
     }
     
     private func toggleFolder() {
-        if isExpanded {
-            vm.expandedServerPaths.remove(node.path)
-        } else {
-            vm.expandedServerPaths.insert(node.path)
-            loadChildren()
+        withAnimation(.spring(response: Theme.animationNormal, dampingFraction: 0.8)) {
+            if isExpanded {
+                vm.expandedServerPaths.remove(node.path)
+            } else {
+                vm.expandedServerPaths.insert(node.path)
+                loadChildren()
+            }
         }
     }
     
