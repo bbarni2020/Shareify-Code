@@ -14,6 +14,22 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
+fun JSONObject.toMap(): Map<String, Any> {
+    val map = mutableMapOf<String, Any>()
+    keys().forEach { key ->
+        map[key] = get(key)
+    }
+    return map
+}
+
+fun org.json.JSONArray.toList(): List<Any> {
+    val list = mutableListOf<Any>()
+    for (i in 0 until length()) {
+        list.add(get(i))
+    }
+    return list
+}
+
 class CryptoManager(private val clientId: String) {
     private var privateKey: PrivateKey? = null
     private var publicKey: PublicKey? = null

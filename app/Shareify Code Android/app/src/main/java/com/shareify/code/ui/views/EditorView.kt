@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -45,7 +46,7 @@ fun EditorView(
                     FileTab(
                         file = file,
                         isActive = viewModel.activeFileID == file.id,
-                        onClick = { viewModel.activeFileID = file.id },
+                        onClick = { viewModel.openFile(file.url) },
                         onClose = { viewModel.closeFile(file.id) }
                     )
                 }
@@ -70,7 +71,7 @@ fun EditorView(
                     verticalArrangement = Arrangement.spacedBy(AppDimensions.SpacingM.dp)
                 ) {
                     Icon(
-                        Icons.Default.InsertDriveFile,
+                        Icons.Default.Description,
                         contentDescription = null,
                         tint = AppColors.TextTertiary,
                         modifier = Modifier.size(64.dp)
@@ -178,9 +179,9 @@ fun CodeEditorView(
                 focusedContainerColor = AppColors.Background,
                 unfocusedContainerColor = AppColors.Background,
                 disabledContainerColor = AppColors.Background,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                disabledIndicatorColor = Color.Transparent,
+                focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                disabledIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
                 focusedTextColor = AppColors.TextPrimary,
                 unfocusedTextColor = AppColors.TextPrimary
             ),

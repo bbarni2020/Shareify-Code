@@ -33,14 +33,12 @@ class MainActivity : ComponentActivity() {
         
         setContent {
             val systemUiController = rememberSystemUiController()
-            
             SideEffect {
                 systemUiController.setSystemBarsColor(
-                    color = android.graphics.Color.TRANSPARENT,
+                    color = Color.Transparent,
                     darkIcons = false
                 )
             }
-            
             ShareifyCodeApp()
         }
     }
@@ -49,11 +47,12 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShareifyCodeApp() {
-    val viewModel = remember { WorkspaceViewModel(androidx.compose.ui.platform.LocalContext.current) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val viewModel = remember { WorkspaceViewModel(context) }
     var showSharAI by remember { mutableStateOf(false) }
     var aiEnabled by remember { mutableStateOf(true) }
     var isServerConnected by remember { mutableStateOf(false) }
-    var isSignedIn by remember { mutableStateOf(false) }
+    var isSignedIn by remember { mutableStateOf(true) }
     
     MaterialTheme(
         colorScheme = darkColorScheme(

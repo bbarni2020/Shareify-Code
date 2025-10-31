@@ -139,7 +139,7 @@ fun FileTreeItem(
                 }
                 .background(
                     if (selectedNode?.id == node.id) AppColors.SurfaceElevated
-                    else Color.Transparent
+                    else androidx.compose.ui.graphics.Color.Transparent
                 )
                 .padding(
                     start = indentSize + AppDimensions.SpacingM.dp,

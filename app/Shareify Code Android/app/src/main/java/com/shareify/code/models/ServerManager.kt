@@ -88,7 +88,7 @@ class ServerManager private constructor(private val context: Context) {
             var requestBody = JSONObject().apply {
                 put("command", command)
                 put("method", method)
-                put("wait_time", waitTime)
+                put("wait_time", waitTime.toLong())
                 if (body.isNotEmpty()) {
                     put("body", JSONObject(body))
                 }
@@ -102,7 +102,7 @@ class ServerManager private constructor(private val context: Context) {
                     requestBody = JSONObject().apply {
                         put("encrypted", true)
                         put("client_id", clientId)
-                        put("encrypted_payload", encryptedPayload)
+                        put("encrypted_payload", JSONObject(encryptedPayload))
                     }
                 }
             }
@@ -136,17 +136,25 @@ class ServerManager private constructor(private val context: Context) {
                         }
                     }
                     
-                    Result.success(json.toMap())
+                    val resultMap = mutableMapOf<String, Any>()
+                    json.keys().forEach { key ->
+                        resultMap[key] = json.get(key)
+                    }
+                    Result.success(resultMap as Map<String, Any>)
                 } catch (e: Exception) {
                     try {
                         val jsonArray = JSONArray(responseBody)
-                        Result.success(jsonArray.toList())
+                        val resultList = mutableListOf<Any>()
+                        for (i in 0 until jsonArray.length()) {
+                            resultList.add(jsonArray.get(i))
+                        }
+                        Result.success(resultList as List<Any>)
                     } catch (e2: Exception) {
                         Result.failure(ServerError.InvalidResponse)
                     }
                 }
             } else {
-                Result.failure(ServerError.ServerError(responseBody ?: "Unknown error"))
+                Result.failure(ServerError.ServerErrorMessage(responseBody ?: "Unknown error"))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -234,9 +242,13 @@ class ServerManager private constructor(private val context: Context) {
                             .putString("server_password", password)
                             .apply()
                     }
-                    Result.success(json.toMap())
+                    val resultMap = mutableMapOf<String, Any>()
+                    json.keys().forEach { key ->
+                        resultMap[key] = json.get(key)
+                    }
+                    Result.success(resultMap)
                 } else {
-                    Result.failure(ServerError.ServerError(responseBody ?: "Login failed"))
+                    Result.failure(ServerError.ServerErrorMessage(responseBody ?: "Login failed"))
                 }
             } catch (e: Exception) {
                 Result.failure(e)
@@ -267,9 +279,13 @@ class ServerManager private constructor(private val context: Context) {
                         .putString("user_email", email)
                         .putString("user_password", password)
                         .apply()
-                    Result.success(json.toMap())
+                    val resultMap = mutableMapOf<String, Any>()
+                    json.keys().forEach { key ->
+                        resultMap[key] = json.get(key)
+                    }
+                    Result.success(resultMap)
                 } else {
-                    Result.failure(ServerError.ServerError(responseBody ?: "Bridge login failed"))
+                    Result.failure(ServerError.ServerErrorMessage(responseBody ?: "Bridge login failed"))
                 }
             } catch (e: Exception) {
                 Result.failure(e)
@@ -320,26 +336,10 @@ class ServerManager private constructor(private val context: Context) {
     }
 }
 
-sealed class ServerError : Exception() {
-    object NoJWTToken : ServerError()
-    object NoCredentials : ServerError()
-    object InvalidResponse : ServerError()
-    object AuthFailed : ServerError()
-    data class ServerError(val message: String) : com.shareify.code.models.ServerError()
-}
-
-private fun JSONObject.toMap(): Map<String, Any> {
-    val map = mutableMapOf<String, Any>()
-    keys().forEach { key ->
-        map[key] = get(key)
-    }
-    return map
-}
-
-private fun JSONArray.toList(): List<Any> {
-    val list = mutableListOf<Any>()
-    for (i in 0 until length()) {
-        list.add(get(i))
-    }
-    return list
+sealed class ServerError(override val message: String) : Exception(message) {
+    object NoJWTToken : ServerError("No JWT token available")
+    object NoCredentials : ServerError("No credentials stored")
+    object InvalidResponse : ServerError("Invalid server response")
+    object AuthFailed : ServerError("Authentication failed")
+    class ServerErrorMessage(message: String) : ServerError(message)
 }

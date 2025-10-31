@@ -195,8 +195,8 @@ fun SharAIView(
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = AppColors.SurfaceElevated,
                         unfocusedContainerColor = AppColors.SurfaceElevated,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
+                        focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                        unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
                         focusedTextColor = AppColors.TextPrimary,
                         unfocusedTextColor = AppColors.TextPrimary
                     ),
@@ -215,7 +215,7 @@ fun SharAIView(
                             val contextMessage = if (includeContext) {
                                 workspaceViewModel.openFiles
                                     .firstOrNull { it.id == workspaceViewModel.activeFileID }
-                                    ?.let { "\n\nCurrent file: ${it.title}\n\`\`\`\n${it.content}\n\`\`\`" }
+                                    ?.let { "\n\nCurrent file: ${it.title}\n```\n${it.content}\n```" }
                                     ?: ""
                             } else ""
                             
@@ -253,7 +253,7 @@ fun SharAIView(
                     Icon(
                         Icons.Default.Send,
                         contentDescription = "Send",
-                        tint = if (inputText.isNotBlank()) Color.White else AppColors.TextTertiary
+                        tint = if (inputText.isNotBlank()) androidx.compose.ui.graphics.Color.White else AppColors.TextTertiary
                     )
                 }
             }
@@ -284,7 +284,7 @@ fun MessageBubble(
             Text(
                 text = message.content,
                 fontSize = 13.sp,
-                color = if (isUser) Color.White else AppColors.TextPrimary,
+                color = if (isUser) androidx.compose.ui.graphics.Color.White else AppColors.TextPrimary,
                 lineHeight = 18.sp,
                 fontFamily = if (!isUser && message.content.contains("```")) FontFamily.Monospace else FontFamily.Default
             )
@@ -301,7 +301,7 @@ fun MessageBubble(
                         onClick = { onActionClick(action) },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = AppColors.Success,
-                            contentColor = Color.White
+                            contentColor = androidx.compose.ui.graphics.Color.White
                         ),
                         modifier = Modifier.height(32.dp),
                         shape = RoundedCornerShape(AppDimensions.RadiusM.dp)
