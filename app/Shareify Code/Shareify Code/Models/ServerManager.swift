@@ -467,6 +467,10 @@ class ServerManager {
     }
     
     func testServerConnection(completion: @escaping (Bool) -> Void) {
+        testServerConnection(retryOnAuth: true, completion: completion)
+    }
+    
+    private func testServerConnection(retryOnAuth: Bool, completion: @escaping (Bool) -> Void) {
         guard let jwtToken = UserDefaults.standard.string(forKey: "jwt_token"), !jwtToken.isEmpty else {
             completion(false)
             return
@@ -500,7 +504,7 @@ class ServerManager {
             return
         }
         
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             if let _ = error {
                 DispatchQueue.main.async {
                     completion(false)
@@ -509,8 +513,30 @@ class ServerManager {
             }
             
             if let httpResponse = response as? HTTPURLResponse {
-                DispatchQueue.main.async {
-                    completion(httpResponse.statusCode == 200 || httpResponse.statusCode == 404)
+                if httpResponse.statusCode == 401 && retryOnAuth {
+                    if let username = UserDefaults.standard.string(forKey: "server_username"),
+                       let password = UserDefaults.standard.string(forKey: "server_password"),
+                       !username.isEmpty, !password.isEmpty {
+                        
+                        self?.loginToServer(username: username, password: password) { result in
+                            switch result {
+                            case .success(_):
+                                self?.testServerConnection(retryOnAuth: false, completion: completion)
+                            case .failure(_):
+                                DispatchQueue.main.async {
+                                    completion(false)
+                                }
+                            }
+                        }
+                    } else {
+                        DispatchQueue.main.async {
+                            completion(false)
+                        }
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        completion(httpResponse.statusCode == 200 || httpResponse.statusCode == 404)
+                    }
                 }
             } else {
                 DispatchQueue.main.async {
