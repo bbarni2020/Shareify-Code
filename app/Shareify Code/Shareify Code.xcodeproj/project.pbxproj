@@ -31,12 +31,25 @@
 		10FB6CAC2EA3A51400C87E84 /* Shareify Code.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Shareify Code.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		10FB6CB92EA3A51600C87E84 /* Shareify CodeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Shareify CodeTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		10FB6CC32EA3A51600C87E84 /* Shareify CodeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Shareify CodeUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		10FB6D1002EA3B0000C87E84 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Secrets.xcconfig; sourceTree = "<group>"; };
+		10FB6D1002EA3B0000C87E84 /* Config/Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Secrets.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		101D9C8C2EC549FD009CAB9F /* Exceptions for "Shareify Code" folder in "Shareify Code" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 10FB6CAB2EA3A51400C87E84 /* Shareify Code */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		10FB6CAE2EA3A51400C87E84 /* Shareify Code */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				101D9C8C2EC549FD009CAB9F /* Exceptions for "Shareify Code" folder in "Shareify Code" target */,
+			);
 			path = "Shareify Code";
 			sourceTree = "<group>";
 		};
@@ -81,7 +94,7 @@
 		10FB6CA32EA3A51400C87E84 = {
 			isa = PBXGroup;
 			children = (
-				10FB6D1002EA3B0000C87E84 /* Secrets.xcconfig */,
+				10FB6D1002EA3B0000C87E84 /* Config/Secrets.xcconfig */,
 				10FB6CAE2EA3A51400C87E84 /* Shareify Code */,
 				10FB6CBC2EA3A51600C87E84 /* Shareify CodeTests */,
 				10FB6CC62EA3A51600C87E84 /* Shareify CodeUITests */,
@@ -403,6 +416,7 @@
 		};
 		10FB6CCE2EA3A51600C87E84 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 10FB6D1002EA3B0000C87E84 /* Config/Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -410,15 +424,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = P6PV2R9443;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_AI_API_KEY = "$(AI_API_KEY)";
-				INFOPLIST_KEY_CFBundleDisplayName = "Shareify Code";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Shareify Code/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -436,11 +443,11 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 2;
 			};
-			baseConfigurationReference = 10FB6D1002EA3B0000C87E84 /* Secrets.xcconfig */;
 			name = Debug;
 		};
 		10FB6CCF2EA3A51600C87E84 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 10FB6D1002EA3B0000C87E84 /* Config/Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -448,15 +455,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = P6PV2R9443;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_AI_API_KEY = "$(AI_API_KEY)";
-				INFOPLIST_KEY_CFBundleDisplayName = "Shareify Code";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Shareify Code/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -474,7 +474,6 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 2;
 			};
-			baseConfigurationReference = 10FB6D1002EA3B0000C87E84 /* Secrets.xcconfig */;
 			name = Release;
 		};
 		10FB6CD12EA3A51600C87E84 /* Debug */ = {

@@ -82,7 +82,12 @@ final class AIService {
     private let baseURL = "https://ai.hackclub.com"
     private let session: URLSession
     private let systemPrompt: String
-    private var apiKey: String { Bundle.main.object(forInfoDictionaryKey: "AI_API_KEY") as? String ?? "" }
+    private func resolveAPIKey() -> String {
+        if let plistKey = Bundle.main.object(forInfoDictionaryKey: "AI_API_KEY") as? String, !plistKey.isEmpty { return plistKey }
+        if let envKey = ProcessInfo.processInfo.environment["AI_API_KEY"], !envKey.isEmpty { return envKey }
+        if let stored = KeychainHelper.get(service: "ShareifyAI", account: "hackclub_ai_api_key"), !stored.isEmpty { return stored }
+        return ""
+    }
     
     private init() {
         let config = URLSessionConfiguration.default
@@ -104,9 +109,23 @@ final class AIService {
     }
     
     func fetchModels() async throws -> [AIModel] {
-    let apiKey = apiKey
-    guard !apiKey.isEmpty else { throw AIServiceError.serverError("Missing AI API key") }
-    guard let url = URL(string: "\(baseURL)/proxy/v1/models") else {
+        #if DEBUG
+        print("[AIService] build=DEBUG")
+        #else
+        print("[AIService] build=RELEASE")
+        #endif
+        let apiKey = resolveAPIKey()
+        let plistKeyVal = Bundle.main.object(forInfoDictionaryKey: "AI_API_KEY") as? String ?? "nil"
+        let envKeyStatus = ProcessInfo.processInfo.environment["AI_API_KEY"] != nil ? "set" : "unset"
+        print("[AIService] fetchModels preflight keyLen=\(apiKey.count) plistKey=\(plistKeyVal) envKey=\(envKeyStatus)")
+        #if DEBUG
+        assert(!apiKey.isEmpty, "AI_API_KEY is missing (set in xcconfig / Info.plist).")
+        #endif
+        guard !apiKey.isEmpty else {
+            print("[AIService] fetchModels abort: missing key")
+            throw AIServiceError.serverError("Missing AI API key")
+        }
+        guard let url = URL(string: "\(baseURL)/proxy/v1/models") else {
             throw AIServiceError.invalidURL
         }
         
@@ -114,6 +133,7 @@ final class AIService {
             var request = URLRequest(url: url)
             request.httpMethod = "GET"
             request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            print("[AIService] fetchModels keyLen=\(apiKey.count) url=\(url.absoluteString)")
             let (data, response) = try await session.data(for: request)
             
             guard let httpResponse = response as? HTTPURLResponse else {
@@ -141,9 +161,23 @@ final class AIService {
         temperature: Double = 0.7,
         maxTokens: Int? = nil
     ) async throws -> String {
-    let apiKey = apiKey
-    guard !apiKey.isEmpty else { throw AIServiceError.serverError("Missing AI API key") }
-    guard let url = URL(string: "\(baseURL)/proxy/v1/chat/completions") else {
+        #if DEBUG
+        print("[AIService] build=DEBUG")
+        #else
+        print("[AIService] build=RELEASE")
+        #endif
+        let apiKey = resolveAPIKey()
+        let plistKeyVal = Bundle.main.object(forInfoDictionaryKey: "AI_API_KEY") as? String ?? "nil"
+        let envKeyStatus = ProcessInfo.processInfo.environment["AI_API_KEY"] != nil ? "set" : "unset"
+        print("[AIService] sendMessage preflight keyLen=\(apiKey.count) plistKey=\(plistKeyVal) envKey=\(envKeyStatus)")
+        #if DEBUG
+        assert(!apiKey.isEmpty, "AI_API_KEY is missing (set in xcconfig / Info.plist).")
+        #endif
+        guard !apiKey.isEmpty else {
+            print("[AIService] sendMessage abort: missing key")
+            throw AIServiceError.serverError("Missing AI API key")
+        }
+        guard let url = URL(string: "\(baseURL)/proxy/v1/chat/completions") else {
             throw AIServiceError.invalidURL
         }
         
@@ -164,6 +198,7 @@ final class AIService {
         
         do {
             request.httpBody = try JSONEncoder().encode(chatRequest)
+            print("[AIService] sendMessage keyLen=\(apiKey.count) model=\(model) messages=\(messages.count) bodyBytes=\(request.httpBody?.count ?? 0) url=\(url.absoluteString)")
             
             let (data, response) = try await session.data(for: request)
             
