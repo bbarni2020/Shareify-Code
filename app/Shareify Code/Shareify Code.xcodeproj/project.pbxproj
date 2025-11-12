@@ -31,6 +31,7 @@
 		10FB6CAC2EA3A51400C87E84 /* Shareify Code.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Shareify Code.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		10FB6CB92EA3A51600C87E84 /* Shareify CodeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Shareify CodeTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		10FB6CC32EA3A51600C87E84 /* Shareify CodeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Shareify CodeUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		10FB6D1002EA3B0000C87E84 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Secrets.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -80,6 +81,7 @@
 		10FB6CA32EA3A51400C87E84 = {
 			isa = PBXGroup;
 			children = (
+				10FB6D1002EA3B0000C87E84 /* Secrets.xcconfig */,
 				10FB6CAE2EA3A51400C87E84 /* Shareify Code */,
 				10FB6CBC2EA3A51600C87E84 /* Shareify CodeTests */,
 				10FB6CC62EA3A51600C87E84 /* Shareify CodeUITests */,
@@ -409,6 +411,7 @@
 				DEVELOPMENT_TEAM = P6PV2R9443;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_AI_API_KEY = "$(AI_API_KEY)";
 				INFOPLIST_KEY_CFBundleDisplayName = "Shareify Code";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -433,6 +436,7 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 2;
 			};
+			baseConfigurationReference = 10FB6D1002EA3B0000C87E84 /* Secrets.xcconfig */;
 			name = Debug;
 		};
 		10FB6CCF2EA3A51600C87E84 /* Release */ = {
@@ -445,6 +449,7 @@
 				DEVELOPMENT_TEAM = P6PV2R9443;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_AI_API_KEY = "$(AI_API_KEY)";
 				INFOPLIST_KEY_CFBundleDisplayName = "Shareify Code";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -469,6 +474,7 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 2;
 			};
+			baseConfigurationReference = 10FB6D1002EA3B0000C87E84 /* Secrets.xcconfig */;
 			name = Release;
 		};
 		10FB6CD12EA3A51600C87E84 /* Debug */ = {
