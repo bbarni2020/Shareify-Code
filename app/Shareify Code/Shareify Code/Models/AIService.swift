@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 struct ChatMessage: Codable {
     let role: String
@@ -82,9 +83,8 @@ final class AIService {
     private let baseURL = "https://ai.hackclub.com"
     private let session: URLSession
     private let systemPrompt: String
-    private var apiKey: String {
-        Bundle.main.object(forInfoDictionaryKey: "AI_API_KEY") as? String ?? ""
-    }
+    private let keychainService = "ShareifyAI"
+    private let keychainAccount = "hackclub_ai_api_key"
     
     private init() {
         let config = URLSessionConfiguration.default
@@ -106,7 +106,9 @@ final class AIService {
     }
     
     func fetchModels() async throws -> [AIModel] {
-        guard !apiKey.isEmpty else { throw AIServiceError.serverError("Missing AI API key") }
+        guard let apiKey = KeychainHelper.get(service: keychainService, account: keychainAccount), !apiKey.isEmpty else {
+            throw AIServiceError.serverError("Missing AI API key")
+        }
         guard let url = URL(string: "\(baseURL)/models") else {
             throw AIServiceError.invalidURL
         }
@@ -142,7 +144,9 @@ final class AIService {
         temperature: Double = 0.7,
         maxTokens: Int? = nil
     ) async throws -> String {
-        guard !apiKey.isEmpty else { throw AIServiceError.serverError("Missing AI API key") }
+        guard let apiKey = KeychainHelper.get(service: keychainService, account: keychainAccount), !apiKey.isEmpty else {
+            throw AIServiceError.serverError("Missing AI API key")
+        }
         guard let url = URL(string: "\(baseURL)/chat/completions") else {
             throw AIServiceError.invalidURL
         }

@@ -97,12 +97,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		10FB6D002EA3A6000C87E84 /* Secrets.xcconfig */ = {
-			isa = PBXFileReference;
-			lastKnownFileType = text.xcconfig;
-			path = Config/Secrets.xcconfig;
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -191,7 +185,6 @@
 					10FB6CB82EA3A51600C87E84 = {
 						CreatedOnToolsVersion = 26.0.1;
 						TestTargetID = 10FB6CAB2EA3A51400C87E84;
-							10FB6D002EA3A6000C87E84 /* Secrets.xcconfig */,
 					};
 					10FB6CC22EA3A51600C87E84 = {
 						CreatedOnToolsVersion = 26.0.1;
@@ -409,7 +402,6 @@
 		10FB6CCE2EA3A51600C87E84 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-                AI_API_KEY = ske24388c66dce468988a1721be832b80b17b24c18519147e09bd3b6ad7ee469e9;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
@@ -417,7 +409,6 @@
 				DEVELOPMENT_TEAM = P6PV2R9443;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_AI_API_KEY = "$(AI_API_KEY)";
 				INFOPLIST_KEY_CFBundleDisplayName = "Shareify Code";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -442,13 +433,11 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 2;
 			};
-			baseConfigurationReference = 10FB6D002EA3A6000C87E84 /* Secrets.xcconfig */;
 			name = Debug;
 		};
 		10FB6CCF2EA3A51600C87E84 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-                AI_API_KEY = ske24388c66dce468988a1721be832b80b17b24c18519147e09bd3b6ad7ee469e9;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
@@ -456,7 +445,6 @@
 				DEVELOPMENT_TEAM = P6PV2R9443;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_AI_API_KEY = "$(AI_API_KEY)";
 				INFOPLIST_KEY_CFBundleDisplayName = "Shareify Code";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -481,7 +469,6 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 2;
 			};
-			baseConfigurationReference = 10FB6D002EA3A6000C87E84 /* Secrets.xcconfig */;
 			name = Release;
 		};
 		10FB6CD12EA3A51600C87E84 /* Debug */ = {
