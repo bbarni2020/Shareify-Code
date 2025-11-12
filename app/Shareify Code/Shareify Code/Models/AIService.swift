@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 struct ChatMessage: Codable {
     let role: String
@@ -82,6 +83,8 @@ final class AIService {
     private let baseURL = "https://ai.hackclub.com"
     private let session: URLSession
     private let systemPrompt: String
+    private let keychainService = "ShareifyAI"
+    private let keychainAccount = "hackclub_ai_api_key"
     
     private init() {
         let config = URLSessionConfiguration.default
@@ -103,12 +106,18 @@ final class AIService {
     }
     
     func fetchModels() async throws -> [AIModel] {
+        guard let apiKey = KeychainHelper.get(service: keychainService, account: keychainAccount), !apiKey.isEmpty else {
+            throw AIServiceError.serverError("Missing AI API key")
+        }
         guard let url = URL(string: "\(baseURL)/models") else {
             throw AIServiceError.invalidURL
         }
         
         do {
-            let (data, response) = try await session.data(from: url)
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            let (data, response) = try await session.data(for: request)
             
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw AIServiceError.invalidResponse
@@ -135,6 +144,9 @@ final class AIService {
         temperature: Double = 0.7,
         maxTokens: Int? = nil
     ) async throws -> String {
+        guard let apiKey = KeychainHelper.get(service: keychainService, account: keychainAccount), !apiKey.isEmpty else {
+            throw AIServiceError.serverError("Missing AI API key")
+        }
         guard let url = URL(string: "\(baseURL)/chat/completions") else {
             throw AIServiceError.invalidURL
         }
@@ -142,6 +154,7 @@ final class AIService {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         
         var fullMessages = [ChatMessage(role: "system", content: systemPrompt)]
         fullMessages.append(contentsOf: messages)
