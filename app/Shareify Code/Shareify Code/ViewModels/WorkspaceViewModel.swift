@@ -446,14 +446,17 @@ final class WorkspaceViewModel: ObservableObject {
     
     func executeAction(_ action: AIAction) -> Result<String, Error> {
         switch action.type {
-        case .edit(let old, let new):
-            return executeEditAction(old: old, new: new)
+        case .edit(let old, let new, let file):
+            return executeEditAction(old: old, new: new, file: file)
             
         case .rewrite(let file, let content):
             return executeRewriteAction(file: file, content: content)
             
-        case .insert(let after, let content):
-            return executeInsertAction(after: after, content: content)
+        case .insert(let after, let content, let file):
+            return executeInsertAction(after: after, content: content, file: file)
+            
+        case .create(let file, let content):
+            return executeCreateAction(file: file, content: content)
             
         case .terminal(let command, let reason):
             return .success("Terminal command ready: \(command)\nReason: \(reason)")
@@ -463,58 +466,184 @@ final class WorkspaceViewModel: ObservableObject {
         }
     }
     
-    private func executeEditAction(old: String, new: String) -> Result<String, Error> {
-        guard let id = activeFileID, let idx = openFiles.firstIndex(where: { $0.id == id }) else {
-            return .failure(NSError(domain: "AIAction", code: 1, userInfo: [NSLocalizedDescriptionKey: "No active file"]))
+    struct ActionPreview {
+        let title: String
+        let file: String?
+        let before: String?
+        let after: String
+    }
+    
+    func previewAction(_ action: AIAction) -> Result<ActionPreview, Error> {
+        switch action.type {
+        case .edit(let old, let new, let file):
+            var targetURL: URL?
+            if let file, let url = resolveURL(for: file) { targetURL = url }
+            else if let id = activeFileID, let idx = openFiles.firstIndex(where: { $0.id == id }) { targetURL = openFiles[idx].url }
+            guard let url = targetURL, let idx = openOrFindIndex(for: url) else {
+                return .failure(NSError(domain: "AIAction", code: 10, userInfo: [NSLocalizedDescriptionKey: "Target file not found"]))
+            }
+            let before = openFiles[idx].content
+            guard before.contains(old) else {
+                return .failure(NSError(domain: "AIAction", code: 11, userInfo: [NSLocalizedDescriptionKey: "Old snippet not found"]))
+            }
+            let after = before.replacingOccurrences(of: old, with: new)
+            return .success(ActionPreview(title: "Edit Preview", file: url.lastPathComponent, before: before, after: after))
+        case .insert(let after, let content, let file):
+            var targetURL: URL?
+            if let file, let url = resolveURL(for: file) { targetURL = url }
+            else if let id = activeFileID, let idx = openFiles.firstIndex(where: { $0.id == id }) { targetURL = openFiles[idx].url }
+            guard let url = targetURL, let idx = openOrFindIndex(for: url) else {
+                return .failure(NSError(domain: "AIAction", code: 12, userInfo: [NSLocalizedDescriptionKey: "Target file not found"]))
+            }
+            let before = openFiles[idx].content
+            guard let range = before.range(of: after) else {
+                return .failure(NSError(domain: "AIAction", code: 13, userInfo: [NSLocalizedDescriptionKey: "Anchor not found"]))
+            }
+            let insertIndex = range.upperBound
+            var newText = before
+            newText.insert(contentsOf: "\n\(content)", at: insertIndex)
+            return .success(ActionPreview(title: "Insert Preview", file: url.lastPathComponent, before: before, after: newText))
+        case .rewrite(let file, let content):
+            if let url = resolveURL(for: file), let idx = openOrFindIndex(for: url) {
+                let before = openFiles[idx].content
+                return .success(ActionPreview(title: "Rewrite Preview", file: url.lastPathComponent, before: before, after: content))
+            }
+            return .success(ActionPreview(title: "Rewrite Preview (new file)", file: file, before: nil, after: content))
+        case .create(let file, let content):
+            return .success(ActionPreview(title: "Create File Preview", file: file, before: nil, after: content))
+        case .terminal(let command, let reason):
+            let text = "Command: \(command)\nReason: \(reason)"
+            return .success(ActionPreview(title: "Terminal", file: nil, before: nil, after: text))
+        case .search(let pattern, let reason):
+            let text = "Pattern: \(pattern)\nReason: \(reason)"
+            return .success(ActionPreview(title: "Search", file: nil, before: nil, after: text))
         }
-        
+    }
+    
+    private func resolveURL(for fileSpec: String) -> URL? {
+        let fm = FileManager.default
+        if fileSpec.hasPrefix("/") {
+            let url = URL(fileURLWithPath: fileSpec)
+            return fm.fileExists(atPath: url.path) ? url : nil
+        }
+        if let root = rootURL {
+            let url = root.appendingPathComponent(fileSpec)
+            if fm.fileExists(atPath: url.path) { return url }
+        }
+        if let id = activeFileID, let idx = openFiles.firstIndex(where: { $0.id == id }) {
+            let base = openFiles[idx].url.deletingLastPathComponent()
+            let url = base.appendingPathComponent(fileSpec)
+            if fm.fileExists(atPath: url.path) { return url }
+        }
+        if let url = openFiles.first(where: { $0.url.lastPathComponent == fileSpec })?.url {
+            return url
+        }
+        return nil
+    }
+    
+    private func openOrFindIndex(for url: URL) -> Int? {
+        if let idx = openFiles.firstIndex(where: { $0.url == url }) { return idx }
+        openFile(url)
+        return openFiles.firstIndex(where: { $0.url == url })
+    }
+    
+    private func executeEditAction(old: String, new: String, file: String?) -> Result<String, Error> {
+        var targetIdx: Int?
+        if let file, let url = resolveURL(for: file), let idx = openOrFindIndex(for: url) {
+            targetIdx = idx
+        } else if let id = activeFileID, let idx = openFiles.firstIndex(where: { $0.id == id }) {
+            targetIdx = idx
+        }
+        guard let idx = targetIdx else {
+            return .failure(NSError(domain: "AIAction", code: 1, userInfo: [NSLocalizedDescriptionKey: "Target file not found"]))
+        }
         let currentContent = openFiles[idx].content
-        
         guard currentContent.contains(old) else {
-            return .failure(NSError(domain: "AIAction", code: 2, userInfo: [NSLocalizedDescriptionKey: "Could not find the code to replace. The file may have been modified."]))
+            return .failure(NSError(domain: "AIAction", code: 2, userInfo: [NSLocalizedDescriptionKey: "Could not find the code to replace."]))
         }
-        
         let newContent = currentContent.replacingOccurrences(of: old, with: new)
         openFiles[idx].content = newContent
         openFiles[idx].isDirty = true
-        
-        return .success("Code successfully updated in \(openFiles[idx].title)")
+        persistFile(at: idx)
+        return .success("Code updated in \(openFiles[idx].title)")
     }
     
     private func executeRewriteAction(file: String, content: String) -> Result<String, Error> {
-        guard let id = activeFileID, let idx = openFiles.firstIndex(where: { $0.id == id }) else {
-            return .failure(NSError(domain: "AIAction", code: 1, userInfo: [NSLocalizedDescriptionKey: "No active file"]))
+        let fm = FileManager.default
+        if let url = resolveURL(for: file), let idx = openOrFindIndex(for: url) {
+            openFiles[idx].content = content
+            openFiles[idx].isDirty = true
+            persistFile(at: idx)
+            return .success("File \(openFiles[idx].title) rewritten")
         }
-        
-        if openFiles[idx].title != file {
-            return .failure(NSError(domain: "AIAction", code: 3, userInfo: [NSLocalizedDescriptionKey: "File name mismatch. Expected \(openFiles[idx].title) but got \(file)"]))
+        guard let base = rootURL ?? openFiles.first?.url.deletingLastPathComponent() else {
+            return .failure(NSError(domain: "AIAction", code: 4, userInfo: [NSLocalizedDescriptionKey: "No workspace root"]))
         }
-        
-        openFiles[idx].content = content
-        openFiles[idx].isDirty = true
-        
-        return .success("File \(file) completely rewritten")
+        let targetURL = base.appendingPathComponent(file)
+        do {
+            try fm.createDirectory(at: targetURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try content.write(to: targetURL, atomically: true, encoding: .utf8)
+            openFile(targetURL)
+            return .success("File \(targetURL.lastPathComponent) created and written")
+        } catch {
+            return .failure(error)
+        }
     }
     
-    private func executeInsertAction(after: String, content: String) -> Result<String, Error> {
-        guard let id = activeFileID, let idx = openFiles.firstIndex(where: { $0.id == id }) else {
-            return .failure(NSError(domain: "AIAction", code: 1, userInfo: [NSLocalizedDescriptionKey: "No active file"]))
+    private func executeInsertAction(after: String, content: String, file: String?) -> Result<String, Error> {
+        var targetIdx: Int?
+        if let file, let url = resolveURL(for: file), let idx = openOrFindIndex(for: url) {
+            targetIdx = idx
+        } else if let id = activeFileID, let idx = openFiles.firstIndex(where: { $0.id == id }) {
+            targetIdx = idx
         }
-        
+        guard let idx = targetIdx else {
+            return .failure(NSError(domain: "AIAction", code: 1, userInfo: [NSLocalizedDescriptionKey: "Target file not found"]))
+        }
         let currentContent = openFiles[idx].content
-        
         guard let range = currentContent.range(of: after) else {
-            return .failure(NSError(domain: "AIAction", code: 2, userInfo: [NSLocalizedDescriptionKey: "Could not find the anchor point in the file"]))
+            return .failure(NSError(domain: "AIAction", code: 2, userInfo: [NSLocalizedDescriptionKey: "Anchor not found"]))
         }
-        
         let insertIndex = range.upperBound
         var newContent = currentContent
         newContent.insert(contentsOf: "\n\(content)", at: insertIndex)
-        
         openFiles[idx].content = newContent
         openFiles[idx].isDirty = true
-        
-        return .success("Code successfully inserted in \(openFiles[idx].title)")
+        persistFile(at: idx)
+        return .success("Code inserted in \(openFiles[idx].title)")
+    }
+    
+    private func executeCreateAction(file: String, content: String) -> Result<String, Error> {
+        guard let base = rootURL ?? openFiles.first?.url.deletingLastPathComponent() else {
+            return .failure(NSError(domain: "AIAction", code: 4, userInfo: [NSLocalizedDescriptionKey: "No workspace root"]))
+        }
+        let fm = FileManager.default
+        let targetURL = base.appendingPathComponent(file)
+        do {
+            try fm.createDirectory(at: targetURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            if !fm.fileExists(atPath: targetURL.path) {
+                fm.createFile(atPath: targetURL.path, contents: nil)
+            }
+            try content.write(to: targetURL, atomically: true, encoding: .utf8)
+            openFile(targetURL)
+            return .success("File created: \(file)")
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    private func persistFile(at idx: Int) {
+        let f = openFiles[idx]
+        if f.customTitle?.hasPrefix("server") == true {
+            saveServerFile(f)
+            return
+        }
+        do {
+            try f.content.write(to: f.url, atomically: true, encoding: .utf8)
+            openFiles[idx].isDirty = false
+        } catch {
+            print("Save error: \(error)")
+        }
     }
     
     func loadServerFolder(path: String, files: [ServerFileNode]) {

@@ -1,9 +1,10 @@
 import Foundation
 
 enum AIActionType: Codable {
-    case edit(old: String, new: String)
+    case edit(old: String, new: String, file: String?)
     case rewrite(file: String, content: String)
-    case insert(after: String, content: String)
+    case insert(after: String, content: String, file: String?)
+    case create(file: String, content: String)
     case terminal(command: String, reason: String)
     case search(pattern: String, reason: String)
     
@@ -12,7 +13,7 @@ enum AIActionType: Codable {
     }
     
     enum ActionKind: String, Codable {
-        case edit, rewrite, insert, terminal, search
+        case edit, rewrite, insert, create, terminal, search
     }
     
     init(from decoder: Decoder) throws {
@@ -23,7 +24,8 @@ enum AIActionType: Codable {
         case .edit:
             let old = try container.decode(String.self, forKey: .old)
             let new = try container.decode(String.self, forKey: .new)
-            self = .edit(old: old, new: new)
+            let file = try container.decodeIfPresent(String.self, forKey: .file)
+            self = .edit(old: old, new: new, file: file)
         case .rewrite:
             let file = try container.decode(String.self, forKey: .file)
             let content = try container.decode(String.self, forKey: .content)
@@ -31,7 +33,12 @@ enum AIActionType: Codable {
         case .insert:
             let after = try container.decode(String.self, forKey: .after)
             let content = try container.decode(String.self, forKey: .content)
-            self = .insert(after: after, content: content)
+            let file = try container.decodeIfPresent(String.self, forKey: .file)
+            self = .insert(after: after, content: content, file: file)
+        case .create:
+            let file = try container.decode(String.self, forKey: .file)
+            let content = try container.decode(String.self, forKey: .content)
+            self = .create(file: file, content: content)
         case .terminal:
             let command = try container.decode(String.self, forKey: .command)
             let reason = try container.decode(String.self, forKey: .reason)
@@ -47,17 +54,23 @@ enum AIActionType: Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         
         switch self {
-        case .edit(let old, let new):
+        case .edit(let old, let new, let file):
             try container.encode(ActionKind.edit, forKey: .type)
             try container.encode(old, forKey: .old)
             try container.encode(new, forKey: .new)
+            if let file { try container.encode(file, forKey: .file) }
         case .rewrite(let file, let content):
             try container.encode(ActionKind.rewrite, forKey: .type)
             try container.encode(file, forKey: .file)
             try container.encode(content, forKey: .content)
-        case .insert(let after, let content):
+        case .insert(let after, let content, let file):
             try container.encode(ActionKind.insert, forKey: .type)
             try container.encode(after, forKey: .after)
+            try container.encode(content, forKey: .content)
+            if let file { try container.encode(file, forKey: .file) }
+        case .create(let file, let content):
+            try container.encode(ActionKind.create, forKey: .type)
+            try container.encode(file, forKey: .file)
             try container.encode(content, forKey: .content)
         case .terminal(let command, let reason):
             try container.encode(ActionKind.terminal, forKey: .type)
@@ -88,11 +101,31 @@ final class AIActionParser {
         var actions: [AIAction] = []
         var cleanText = response
         
+        let editWithFilePattern = #"<ACTION:EDIT>\s*<FILE>([\s\S]*?)</FILE>\s*<OLD>([\s\S]*?)</OLD>\s*<NEW>([\s\S]*?)</NEW>\s*</ACTION:EDIT>"#
         let editPattern = #"<ACTION:EDIT>\s*<OLD>([\s\S]*?)</OLD>\s*<NEW>([\s\S]*?)</NEW>\s*</ACTION:EDIT>"#
         let rewritePattern = #"<ACTION:REWRITE>\s*<FILE>([\s\S]*?)</FILE>\s*<CONTENT>([\s\S]*?)</CONTENT>\s*</ACTION:REWRITE>"#
+        let insertWithFilePattern = #"<ACTION:INSERT>\s*<AFTER>([\s\S]*?)</AFTER>\s*<FILE>([\s\S]*?)</FILE>\s*<CONTENT>([\s\S]*?)</CONTENT>\s*</ACTION:INSERT>"#
         let insertPattern = #"<ACTION:INSERT>\s*<AFTER>([\s\S]*?)</AFTER>\s*<CONTENT>([\s\S]*?)</CONTENT>\s*</ACTION:INSERT>"#
+        let createPattern = #"<ACTION:CREATE>\s*<FILE>([\s\S]*?)</FILE>\s*<CONTENT>([\s\S]*?)</CONTENT>\s*</ACTION:CREATE>"#
         let terminalPattern = #"<ACTION:TERMINAL>\s*<COMMAND>([\s\S]*?)</COMMAND>\s*<REASON>([\s\S]*?)</REASON>\s*</ACTION:TERMINAL>"#
         let searchPattern = #"<ACTION:SEARCH>\s*<PATTERN>([\s\S]*?)</PATTERN>\s*<REASON>([\s\S]*?)</REASON>\s*</ACTION:SEARCH>"#
+        
+        if let editRegex = try? NSRegularExpression(pattern: editWithFilePattern, options: []) {
+            let matches = editRegex.matches(in: response, options: [], range: NSRange(response.startIndex..., in: response))
+            for match in matches.reversed() {
+                guard match.numberOfRanges == 4,
+                      let fileRange = Range(match.range(at: 1), in: response),
+                      let oldRange = Range(match.range(at: 2), in: response),
+                      let newRange = Range(match.range(at: 3), in: response),
+                      let fullRange = Range(match.range(at: 0), in: response) else { continue }
+                let file = String(response[fileRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let old = String(response[oldRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let new = String(response[newRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let rawText = String(response[fullRange])
+                actions.insert(AIAction(type: .edit(old: old, new: new, file: file), rawText: rawText), at: 0)
+                cleanText = cleanText.replacingOccurrences(of: rawText, with: "")
+            }
+        }
         
         if let editRegex = try? NSRegularExpression(pattern: editPattern, options: []) {
             let matches = editRegex.matches(in: response, options: [], range: NSRange(response.startIndex..., in: response))
@@ -101,12 +134,10 @@ final class AIActionParser {
                       let oldRange = Range(match.range(at: 1), in: response),
                       let newRange = Range(match.range(at: 2), in: response),
                       let fullRange = Range(match.range(at: 0), in: response) else { continue }
-                
                 let old = String(response[oldRange]).trimmingCharacters(in: .whitespacesAndNewlines)
                 let new = String(response[newRange]).trimmingCharacters(in: .whitespacesAndNewlines)
                 let rawText = String(response[fullRange])
-                
-                actions.insert(AIAction(type: .edit(old: old, new: new), rawText: rawText), at: 0)
+                actions.insert(AIAction(type: .edit(old: old, new: new, file: nil), rawText: rawText), at: 0)
                 cleanText = cleanText.replacingOccurrences(of: rawText, with: "")
             }
         }
@@ -118,12 +149,27 @@ final class AIActionParser {
                       let fileRange = Range(match.range(at: 1), in: response),
                       let contentRange = Range(match.range(at: 2), in: response),
                       let fullRange = Range(match.range(at: 0), in: response) else { continue }
-                
                 let file = String(response[fileRange]).trimmingCharacters(in: .whitespacesAndNewlines)
                 let content = String(response[contentRange]).trimmingCharacters(in: .whitespacesAndNewlines)
                 let rawText = String(response[fullRange])
-                
                 actions.insert(AIAction(type: .rewrite(file: file, content: content), rawText: rawText), at: 0)
+                cleanText = cleanText.replacingOccurrences(of: rawText, with: "")
+            }
+        }
+        
+        if let insertRegex = try? NSRegularExpression(pattern: insertWithFilePattern, options: []) {
+            let matches = insertRegex.matches(in: response, options: [], range: NSRange(response.startIndex..., in: response))
+            for match in matches.reversed() {
+                guard match.numberOfRanges == 4,
+                      let afterRange = Range(match.range(at: 1), in: response),
+                      let fileRange = Range(match.range(at: 2), in: response),
+                      let contentRange = Range(match.range(at: 3), in: response),
+                      let fullRange = Range(match.range(at: 0), in: response) else { continue }
+                let after = String(response[afterRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let file = String(response[fileRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let content = String(response[contentRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let rawText = String(response[fullRange])
+                actions.insert(AIAction(type: .insert(after: after, content: content, file: file), rawText: rawText), at: 0)
                 cleanText = cleanText.replacingOccurrences(of: rawText, with: "")
             }
         }
@@ -135,12 +181,25 @@ final class AIActionParser {
                       let afterRange = Range(match.range(at: 1), in: response),
                       let contentRange = Range(match.range(at: 2), in: response),
                       let fullRange = Range(match.range(at: 0), in: response) else { continue }
-                
                 let after = String(response[afterRange]).trimmingCharacters(in: .whitespacesAndNewlines)
                 let content = String(response[contentRange]).trimmingCharacters(in: .whitespacesAndNewlines)
                 let rawText = String(response[fullRange])
-                
-                actions.insert(AIAction(type: .insert(after: after, content: content), rawText: rawText), at: 0)
+                actions.insert(AIAction(type: .insert(after: after, content: content, file: nil), rawText: rawText), at: 0)
+                cleanText = cleanText.replacingOccurrences(of: rawText, with: "")
+            }
+        }
+        
+        if let createRegex = try? NSRegularExpression(pattern: createPattern, options: []) {
+            let matches = createRegex.matches(in: response, options: [], range: NSRange(response.startIndex..., in: response))
+            for match in matches.reversed() {
+                guard match.numberOfRanges == 3,
+                      let fileRange = Range(match.range(at: 1), in: response),
+                      let contentRange = Range(match.range(at: 2), in: response),
+                      let fullRange = Range(match.range(at: 0), in: response) else { continue }
+                let file = String(response[fileRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let content = String(response[contentRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let rawText = String(response[fullRange])
+                actions.insert(AIAction(type: .create(file: file, content: content), rawText: rawText), at: 0)
                 cleanText = cleanText.replacingOccurrences(of: rawText, with: "")
             }
         }
@@ -152,11 +211,9 @@ final class AIActionParser {
                       let commandRange = Range(match.range(at: 1), in: response),
                       let reasonRange = Range(match.range(at: 2), in: response),
                       let fullRange = Range(match.range(at: 0), in: response) else { continue }
-                
                 let command = String(response[commandRange]).trimmingCharacters(in: .whitespacesAndNewlines)
                 let reason = String(response[reasonRange]).trimmingCharacters(in: .whitespacesAndNewlines)
                 let rawText = String(response[fullRange])
-                
                 actions.insert(AIAction(type: .terminal(command: command, reason: reason), rawText: rawText), at: 0)
                 cleanText = cleanText.replacingOccurrences(of: rawText, with: "")
             }
@@ -169,11 +226,9 @@ final class AIActionParser {
                       let patternRange = Range(match.range(at: 1), in: response),
                       let reasonRange = Range(match.range(at: 2), in: response),
                       let fullRange = Range(match.range(at: 0), in: response) else { continue }
-                
                 let pattern = String(response[patternRange]).trimmingCharacters(in: .whitespacesAndNewlines)
                 let reason = String(response[reasonRange]).trimmingCharacters(in: .whitespacesAndNewlines)
                 let rawText = String(response[fullRange])
-                
                 actions.insert(AIAction(type: .search(pattern: pattern, reason: reason), rawText: rawText), at: 0)
                 cleanText = cleanText.replacingOccurrences(of: rawText, with: "")
             }

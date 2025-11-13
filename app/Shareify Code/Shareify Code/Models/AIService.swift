@@ -181,6 +181,31 @@ final class AIService {
         }
     }
     
+    private func pickAutoModel(for messages: [ChatMessage]) -> String {
+        let text = messages.last(where: { $0.role == "user" })?.content.lowercased() ?? ""
+        let totalLen = messages.map { $0.content.count }.reduce(0, +)
+        let hasImageCue = text.contains("![") || text.contains("image:") || text.contains("<img")
+        let hasCodeFence = text.contains("```")
+        let asksRefactor = text.contains("refactor") || text.contains("rewrite")
+        let heavyReasoning = text.contains("explain why") || text.contains("prove") || text.contains("step by step")
+        if hasImageCue {
+            return allowedLanguageModels.contains("google/gemini-2.5-flash-image") ? "google/gemini-2.5-flash-image" : (allowedLanguageModels.first ?? "openai/gpt-5-mini")
+        }
+        if totalLen > 12000 || (hasCodeFence && totalLen > 6000) {
+            return allowedLanguageModels.contains("openai/gpt-oss-120b") ? "openai/gpt-oss-120b" : (allowedLanguageModels.first ?? "openai/gpt-5-mini")
+        }
+        if heavyReasoning {
+            if allowedLanguageModels.contains("moonshotai/kimi-k2-thinking") { return "moonshotai/kimi-k2-thinking" }
+        }
+        if asksRefactor {
+            if allowedLanguageModels.contains("moonshotai/kimi-k2-0905") { return "moonshotai/kimi-k2-0905" }
+        }
+        if text.contains("swift") || text.contains("xcode") || text.contains("ios") {
+            if allowedLanguageModels.contains("qwen/qwen3-32b") { return "qwen/qwen3-32b" }
+        }
+        return allowedLanguageModels.contains("openai/gpt-5-mini") ? "openai/gpt-5-mini" : (allowedLanguageModels.first ?? "openai/gpt-5-mini")
+    }
+
     func sendMessage(
         messages: [ChatMessage],
         modelSelection: ModelSelection = .auto,
@@ -218,11 +243,11 @@ final class AIService {
         let selectedModel: String = {
             switch modelSelection {
             case .auto:
-                return allowedLanguageModels.first ?? "meta-llama/llama-4-maverick"
+                return pickAutoModel(for: fullMessages)
             case .languageModel(let model):
-                return allowedLanguageModels.contains(model) ? model : allowedLanguageModels.first ?? "meta-llama/llama-4-maverick"
+                return allowedLanguageModels.contains(model) ? model : pickAutoModel(for: fullMessages)
             case .embeddingModel(let model):
-                return allowedEmbeddingModels.contains(model) ? model : allowedEmbeddingModels.first ?? "qwen/qwen3-embedding-8b"
+                return allowedEmbeddingModels.contains(model) ? model : (allowedEmbeddingModels.first ?? "qwen/qwen3-embedding-8b")
             }
         }()
 

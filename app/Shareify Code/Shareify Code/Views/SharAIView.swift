@@ -549,15 +549,26 @@ struct SharAIView: View {
         
         var messageContent = userInput
         
-        if includeContext, 
+        if includeContext,
            let activeFile = vm.openFiles.first(where: { $0.id == vm.activeFileID }) {
+            let rootPath = vm.rootURL?.path ?? ""
+            let fullPath = activeFile.url.path
+            let relPath: String = {
+                if !rootPath.isEmpty, fullPath.hasPrefix(rootPath) {
+                    let idx = fullPath.index(fullPath.startIndex, offsetBy: rootPath.count)
+                    let sub = String(fullPath[idx...])
+                    return sub.hasPrefix("/") ? String(sub.dropFirst()) : sub
+                } else {
+                    return activeFile.url.lastPathComponent
+                }
+            }()
             messageContent = """
-            File: \(activeFile.title)
-            
+            Current file: \(relPath)
+
             ```
             \(activeFile.content)
             ```
-            
+
             \(userInput)
             """
         }
@@ -601,7 +612,8 @@ struct SharAIView: View {
                 
                 await MainActor.run {
                     let parsed = AIActionParser.parseActions(from: response)
-                    var aiMessage = DisplayMessage(content: parsed.cleanResponse, isUser: false)
+                    let clean = stripFencedCode(parsed.cleanResponse)
+                    var aiMessage = DisplayMessage(content: clean, isUser: false)
                     aiMessage.actions = parsed.actions
                     chatMessages.append(aiMessage)
                     isLoading = false
@@ -619,6 +631,15 @@ struct SharAIView: View {
                 }
             }
         }
+    }
+
+    private func stripFencedCode(_ text: String) -> String {
+        let pattern = "```[\\s\\S]*?```"
+        if let regex = try? NSRegularExpression(pattern: pattern, options: []) {
+            let range = NSRange(text.startIndex..., in: text)
+            return regex.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: "")
+        }
+        return text
     }
     
     private func saveChatMessages() {
@@ -873,6 +894,8 @@ struct ActionCardView: View {
     let result: Result<String, Error>?
     let onExecute: (Result<String, Error>) -> Void
     @State private var isHovered = false
+    @State private var showPreview = false
+    @State private var previewData: WorkspaceViewModel.ActionPreview?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -903,6 +926,28 @@ struct ActionCardView: View {
                 Spacer()
                 
                 if result == nil {
+                    Button(action: {
+                        let p = vm.previewAction(action)
+                        switch p {
+                        case .success(let prev):
+                            previewData = prev
+                            showPreview = true
+                        case .failure:
+                            break
+                        }
+                    }) {
+                        Text("Preview")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(actionColor)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(actionColor.opacity(0.12))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    
                     Button(action: {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                             executeAction()
@@ -999,6 +1044,79 @@ struct ActionCardView: View {
                         .stroke(actionColor.opacity(0.2), lineWidth: 1.5)
                 )
         )
+        .sheet(isPresented: $showPreview, onDismiss: { previewData = nil }) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(previewData?.title ?? "Preview")
+                            .font(.system(size: 16, weight: .semibold))
+                        if let file = previewData?.file {
+                            Text(file)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(Color.appTextTertiary)
+                        }
+                    }
+                    Spacer()
+                    Button("Close") { showPreview = false }
+                        .buttonStyle(.plain)
+                }
+                if let prev = previewData {
+                    if let before = prev.before {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Before")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(Color.appTextSecondary)
+                                ScrollView {
+                                    Text(before)
+                                        .font(.system(size: 12, weight: .regular, design: .monospaced))
+                                        .foregroundStyle(Color.appTextPrimary)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .fill(Color.appSurfaceElevated)
+                                )
+                            }
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("After")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(Color.appTextSecondary)
+                                ScrollView {
+                                    Text(prev.after)
+                                        .font(.system(size: 12, weight: .regular, design: .monospaced))
+                                        .foregroundStyle(Color.appTextPrimary)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .fill(Color.appSurfaceElevated)
+                                )
+                            }
+                        }
+                    } else {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Content")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Color.appTextSecondary)
+                            ScrollView {
+                                Text(prev.after)
+                                    .font(.system(size: 12, weight: .regular, design: .monospaced))
+                                    .foregroundStyle(Color.appTextPrimary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(Color.appSurfaceElevated)
+                            )
+                        }
+                    }
+                }
+            }
+            .padding(16)
+            .background(Color.appSurface)
+            .frame(minWidth: 900, minHeight: 640)
+        }
     }
     
     private var actionIcon: String {
@@ -1006,6 +1124,7 @@ struct ActionCardView: View {
         case .edit: return "pencil.circle.fill"
         case .rewrite: return "arrow.triangle.2.circlepath"
         case .insert: return "plus.circle.fill"
+        case .create: return "doc.badge.plus"
         case .terminal: return "terminal.fill"
         case .search: return "magnifyingglass.circle.fill"
         }
@@ -1016,6 +1135,7 @@ struct ActionCardView: View {
         case .edit: return .blue
         case .rewrite: return .orange
         case .insert: return .green
+        case .create: return .teal
         case .terminal: return .purple
         case .search: return .cyan
         }
@@ -1023,9 +1143,12 @@ struct ActionCardView: View {
     
     private var actionTitle: String {
         switch action.type {
-        case .edit: return "Edit Code"
-        case .rewrite: return "Rewrite File"
-        case .insert: return "Insert Code"
+        case .edit(_, _, let file):
+            if let file { return "Edit Code in \(file)" } else { return "Edit Code" }
+        case .rewrite(let file, _): return "Rewrite File \(file)"
+        case .insert(_, _, let file):
+            if let file { return "Insert Code in \(file)" } else { return "Insert Code" }
+        case .create(let file, _): return "Create File \(file)"
         case .terminal(let command, _): return "Run: \(command)"
         case .search(let pattern, _): return "Search: \(pattern)"
         }
@@ -1033,12 +1156,14 @@ struct ActionCardView: View {
     
     private var actionDescription: String {
         switch action.type {
-        case .edit:
-            return "Replace code in the current file"
+        case .edit(_, _, let file):
+            return file != nil ? "Replace code in \(file!)" : "Replace code in the current file"
         case .rewrite(let file, _):
             return "Completely rewrite \(file)"
-        case .insert:
-            return "Insert new code into the file"
+        case .insert(_, _, let file):
+            return file != nil ? "Insert new code into \(file!)" : "Insert new code into the file"
+        case .create(let file, _):
+            return "Create a new file at \(file)"
         case .terminal(_, let reason):
             return reason
         case .search(_, let reason):
