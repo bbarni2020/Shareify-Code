@@ -76,6 +76,32 @@ enum AIServiceError: Error, LocalizedError {
     }
 }
 
+let allowedLanguageModels = [
+    "qwen/qwen3-32b",
+    "moonshotai/kimi-k2-thinking",
+    "openai/gpt-oss-120b",
+    "moonshotai/kimi-k2-0905",
+    "qwen/qwen3-vl-235b-a22b-instruct",
+    "nvidia/nemotron-nano-12b-v2-vl",
+    "google/gemini-2.5-flash",
+    "openai/gpt-5-mini",
+    "deepseek/deepseek-r1",
+    "z-ai/glm-4.6",
+    "google/gemini-2.5-flash-image"
+]
+
+let allowedEmbeddingModels = [
+    "qwen/qwen3-embedding-8b",
+    "mistralai/codestral-embed-2505",
+    "openai/text-embedding-3-large"
+]
+
+enum ModelSelection {
+    case auto
+    case languageModel(String)
+    case embeddingModel(String)
+}
+
 final class AIService {
     static let shared = AIService()
     
@@ -157,7 +183,7 @@ final class AIService {
     
     func sendMessage(
         messages: [ChatMessage],
-        model: String = "meta-llama/llama-4-maverick",
+        modelSelection: ModelSelection = .auto,
         temperature: Double = 0.7,
         maxTokens: Int? = nil
     ) async throws -> String {
@@ -180,43 +206,54 @@ final class AIService {
         guard let url = URL(string: "\(baseURL)/proxy/v1/chat/completions") else {
             throw AIServiceError.invalidURL
         }
-        
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        
+
         var fullMessages = [ChatMessage(role: "system", content: systemPrompt)]
         fullMessages.append(contentsOf: messages)
-        
+
+        let selectedModel: String = {
+            switch modelSelection {
+            case .auto:
+                return allowedLanguageModels.first ?? "meta-llama/llama-4-maverick"
+            case .languageModel(let model):
+                return allowedLanguageModels.contains(model) ? model : allowedLanguageModels.first ?? "meta-llama/llama-4-maverick"
+            case .embeddingModel(let model):
+                return allowedEmbeddingModels.contains(model) ? model : allowedEmbeddingModels.first ?? "qwen/qwen3-embedding-8b"
+            }
+        }()
+
         let chatRequest = ChatRequest(
             messages: fullMessages,
-            model: model,
+            model: selectedModel,
             temperature: temperature,
             maxTokens: maxTokens
         )
-        
+
         do {
             request.httpBody = try JSONEncoder().encode(chatRequest)
-            print("[AIService] sendMessage keyLen=\(apiKey.count) model=\(model) messages=\(messages.count) bodyBytes=\(request.httpBody?.count ?? 0) url=\(url.absoluteString)")
-            
+            print("[AIService] sendMessage keyLen=\(apiKey.count) model=\(selectedModel) messages=\(messages.count) bodyBytes=\(request.httpBody?.count ?? 0) url=\(url.absoluteString)")
+
             let (data, response) = try await session.data(for: request)
-            
+
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw AIServiceError.invalidResponse
             }
-            
+
             guard httpResponse.statusCode == 200 else {
                 let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
                 throw AIServiceError.serverError("Status \(httpResponse.statusCode): \(errorMessage)")
             }
-            
+
             let chatResponse = try JSONDecoder().decode(ChatResponse.self, from: data)
-            
+
             guard let firstChoice = chatResponse.choices.first else {
                 throw AIServiceError.invalidResponse
             }
-            
+
             return firstChoice.message.content
         } catch let error as AIServiceError {
             throw error

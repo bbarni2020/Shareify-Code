@@ -7,18 +7,33 @@ struct SharAIView: View {
     @State private var chatMessages: [DisplayMessage] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
-    @AppStorage("sharaiSelectedModel") private var selectedModel = "meta-llama/llama-4-maverick"
+    @AppStorage("sharaiSelectedModel") private var selectedModel = "auto"
     @State private var showModelPicker = false
     @AppStorage("sharaiIncludeContext") private var includeContext = true
     @State private var scrollProxy: ScrollViewProxy?
     @Namespace private var bottomID
     
-    private let availableModels = [
-        "meta-llama/llama-4-maverick",
+    private let availableLanguageModels = [
+        "qwen/qwen3-32b",
+        "moonshotai/kimi-k2-thinking",
         "openai/gpt-oss-120b",
-        "openai/gpt-oss-20b",
-        "moonshotai/kimi-k2-instruct-0905"
+        "moonshotai/kimi-k2-0905",
+        "qwen/qwen3-vl-235b-a22b-instruct",
+        "nvidia/nemotron-nano-12b-v2-vl",
+        "google/gemini-2.5-flash",
+        "openai/gpt-5-mini",
+        "deepseek/deepseek-r1",
+        "z-ai/glm-4.6",
+        "google/gemini-2.5-flash-image"
     ]
+    private let availableEmbeddingModels = [
+        "qwen/qwen3-embedding-8b",
+        "mistralai/codestral-embed-2505",
+        "openai/text-embedding-3-large"
+    ]
+    private var availableModels: [String] {
+        ["auto"] + availableLanguageModels + availableEmbeddingModels
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -568,9 +583,20 @@ struct SharAIView: View {
                     )
                 }
                 
+                let modelSelection: ModelSelection = {
+                    if selectedModel == "auto" {
+                        return .auto
+                    } else if availableLanguageModels.contains(selectedModel) {
+                        return .languageModel(selectedModel)
+                    } else if availableEmbeddingModels.contains(selectedModel) {
+                        return .embeddingModel(selectedModel)
+                    } else {
+                        return .auto
+                    }
+                }()
                 let response = try await AIService.shared.sendMessage(
                     messages: apiMessages,
-                    model: selectedModel
+                    modelSelection: modelSelection
                 )
                 
                 await MainActor.run {
@@ -609,14 +635,28 @@ struct SharAIView: View {
     }
     
     private func shortModelName(_ fullName: String) -> String {
-        if fullName.contains("llama-4") {
+        if fullName == "auto" {
+            return "Auto"
+        } else if fullName.contains("llama-4") {
             return "Llama 4"
         } else if fullName.contains("120b") {
             return "GPT 120B"
-        } else if fullName.contains("20b") {
-            return "GPT 20B"
         } else if fullName.contains("kimi") {
             return "Kimi K2"
+        } else if fullName.contains("gemini") {
+            return "Gemini"
+        } else if fullName.contains("deepseek") {
+            return "DeepSeek"
+        } else if fullName.contains("nemotron") {
+            return "Nemotron"
+        } else if fullName.contains("glm") {
+            return "GLM 4.6"
+        } else if fullName.contains("qwen3-embedding") {
+            return "Qwen Embedding"
+        } else if fullName.contains("codestral-embed") {
+            return "Codestral Embed"
+        } else if fullName.contains("text-embedding-3-large") {
+            return "OpenAI Embedding"
         }
         return fullName
     }
